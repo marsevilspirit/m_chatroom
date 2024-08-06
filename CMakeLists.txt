@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(chatroom)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+add_subdirectory(project/m_netlib)
+add_subdirectory(project/server)
+add_subdirectory(project/client)
+add_subdirectory(project/model)
+add_subdirectory(project/database)
+
+add_executable(chatroom
+    project/chatroom.cc
+)
+
+add_executable(chatclient
+    project/chatclient.cc
+)
+
+target_link_libraries(chatroom server m_netlib model database)
+
+target_link_libraries(chatclient client m_netlib)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+    message("Debug build type detected. Adding debug flags.")
+    add_compile_options(-g -O0)  # 添加调试信息和关闭优化
+endif()
