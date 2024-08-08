@@ -3,6 +3,7 @@
 #include "../m_netlib/Log/mars_logger.h"
 #include "../JsonCodec.h"
 #include "../model/user.h"
+#include "../model/group.h"
 #include <cstdio>
 #include <mutex>
 #include <vector>
@@ -24,6 +25,12 @@ Service::Service(){
     m_handlersMap[UNBLOCK_FRIEND] = std::bind(&Service::handleUnBlockFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[BLOCK_FRIEND_LIST] = std::bind(&Service::handleBlockFriendList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[CHECK_BLOCK] = std::bind(&Service::handleCheckBlock, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[CREATE_GROUP] = std::bind(&Service::handleCreateGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[DISPLAY_ALLGROUP_LIST] = std::bind(&Service::handleDisplayAllGroupList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[REQUEST_GROUP] = std::bind(&Service::requestAddGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[GROUP_REQUEST_LIST] = std::bind(&Service::handleGroupRequestList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[ADD_GROUP] = std::bind(&Service::handleAddSomeoneToGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
 }
 
 void Service::reset() {
@@ -313,7 +320,99 @@ void Service::handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Ti
     conn->send(response.dump().append("\r\n"));
 }
 
+void Service::handleCreateGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    std::string group_name = js["groupname"];
+    int userid = m_connUserMap[conn];
 
+    Group group;
+    group.setName(group_name);
+
+    if (m_groupModel.createGroup(group)){
+        m_groupModel.addGroup(userid, group.getId(), "master");
+        json response;
+        response["msgid"] = CREATE_GROUP_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    } 
+
+    json response;
+    response["msgid"] = CREATE_GROUP_FAIL;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleDisplayAllGroupList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    std::vector<Group> groupVec = m_groupModel.queryAllGroup();
+
+    std::vector<std::string> vec;
+    for (Group &group : groupVec)
+    {
+        json js;
+        js["id"] = group.getId();
+        js["name"] = group.getName();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_ALLGROUP_LIST;
+    response["groups"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["add_group_id"];
+    int userid = m_connUserMap[conn];
+
+    m_groupModel.addGroup(userid, groupid, "request");
+
+    json response;
+    response["msgid"] = REQUEST_GROUP_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+
+    if(m_groupModel.ifMasterOrManager(m_connUserMap[conn], groupid) == false){
+        json response;
+        response["msgid"] = DISPLAY_GROUP_REQUEST_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    std::vector<User> userVec = m_groupModel.queryGroupRequest(groupid);
+
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_GROUP_REQUEST;
+    response["requests"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = js["userid"];
+
+    if(m_groupModel.ifMasterOrManager(m_connUserMap[conn], groupid) == false){
+        json response;
+        response["msgid"] = ADD_GROUP_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    m_groupModel.modifyGroupRole(userid, groupid, "normal");
+
+    json response;
+    response["msgid"] = ADD_GROUP_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
 
 // 处理客户端异常退出
 void Service::clientCloseException(const TcpConnectionPtr &conn){
@@ -327,6 +426,7 @@ void Service::clientCloseException(const TcpConnectionPtr &conn){
                 // 从map表删除用户的链接信息
                 user.setId(it->first);
                 m_userConnMap.erase(it);
+                m_connUserMap.erase(it->second);
                 break;
             }
         }

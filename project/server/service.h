@@ -11,6 +11,7 @@
 #include "../m_netlib/Net/TcpConnection.h"
 #include "../json.hpp"
 #include "../model/friendmodel.h"
+#include "../model/groupmodel.h"
 
 using json = nlohmann::json;
 
@@ -51,6 +52,16 @@ public:
 
     void handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void handleCreateGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDisplayAllGroupList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
 
@@ -69,6 +80,7 @@ private:
 
     UserModel m_userModel;
     FriendModel m_friendModel;
+    GroupModel m_groupModel;
 };
 
 #endif //MARS_SERVICE_H

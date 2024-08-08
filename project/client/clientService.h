@@ -46,6 +46,20 @@ void privateChat(Client &client);
 
 void handlePrivateChat(json &js);
 
+void createGroup(Client &client);
+
+void tellServerWantToLookAllGroupList(Client &client);
+
+void displayAllGroupList(json &js);
+
+void requestEnterGroup(Client &client);
+
+void tellServerWantToLookGroupRequestList(Client &client, int groupid);
+
+void displayGroupRequestList(json &js);
+
+void addSomeoneToGroup(Client &client);
+
 void ExitChatRoom();
 
 #endif //SERVER_H

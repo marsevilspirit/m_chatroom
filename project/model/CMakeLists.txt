@@ -4,6 +4,10 @@ add_library(model
     usermodel.cc
     friendmodel.h 
     friendmodel.cc
+    groupmodel.h
+    groupmodel.cc 
+    groupuser.h 
+    group.h
 )
 
 target_link_libraries(model)

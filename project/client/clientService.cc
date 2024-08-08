@@ -10,8 +10,10 @@
 #include <atomic>
 
 sem_t login_sem;
+sem_t add_someone_to_group;
 std::atomic<bool> login_flag(false);
 std::atomic<bool> if_block(false);
+std::atomic<bool> if_master_ormanager(false);
 
 std::atomic<int> private_chat_id(-1);
 
@@ -46,6 +48,14 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case DISPLAY_FRIEND_LIST: displayFriendList(js); break;
         case BLOCK_FRIEND_LIST:  displayBlockList(js); break;
         case CHECK_BLOCK:        if_block = (js["state1"] == "block") || (js["state2"] == "block"); std::cout << "if_block: " << if_block << std::endl;  break;
+        case CREATE_GROUP_SUCCESS: std::cout << "创建群聊成功" << std::endl; break;
+        case CREATE_GROUP_FAIL: std::cout << "创建群聊失败" << std::endl; break;
+        case DISPLAY_ALLGROUP_LIST: displayAllGroupList(js); break;
+        case REQUEST_GROUP_SUCCESS: std::cout << "提交加入群聊申请成功" << std::endl; break;
+        case DISPLAY_GROUP_REQUEST: displayGroupRequestList(js);if_master_ormanager = true; sem_post(&add_someone_to_group);  break;
+        case DISPLAY_GROUP_REQUEST_FAIL: std::cout << "你不是群主或管理员" << std::endl;if_master_ormanager = false; sem_post(&add_someone_to_group); break;
+        case ADD_GROUP_SUCCESS: std::cout << "添加群成员成功" << std::endl; break;
+        case ADD_GROUP_FAIL: std::cout << "添加群成员失败" << std::endl; break;
         case TEST: std::cout << "收到test json send" <<std::endl; break;
     }
 }
@@ -132,7 +142,7 @@ void EnterCommandMenu(Client &client){
         std::cout << "3.添加好友    4.删除好友\n";
         std::cout << "5.屏蔽好友    6.解除屏蔽\n";
         std::cout << "7.好友列表    8.好友申请列表\n";
-        std::cout << "8.创建群聊    10.申请加入群聊\n";
+        std::cout << "9.创建群聊    10.申请加入群聊\n";
         std::cout << "11.退出群聊   12.解散群聊\n";
         std::cout << "13.群聊列表   14.设置管理员\n";
         std::cout << "15.取消管理员 16.踢人\n";
@@ -154,16 +164,16 @@ void EnterCommandMenu(Client &client){
             case 6:  unblockFriend(client);  break;
             case 7:  tellServerWantToLookFriendList(client); break;
             case 8:  tellServerWantToLookRequestList(client); break;
-            case 9:  std::cout << "创建群聊" << std::endl;     break;
-            case 10: std::cout << "申请加入群聊" << std::endl; break;
+            case 9:  createGroup(client);         break;
+            case 10: requestEnterGroup(client);   break;
             case 11: std::cout << "退出群聊" << std::endl; break;
             case 12: std::cout << "解散群聊" << std::endl; break;
-            case 13: std::cout << "群聊列表" << std::endl; break;
+            case 13: tellServerWantToLookAllGroupList(client); break;
             case 14: std::cout << "设置管理员" << std::endl; break;
             case 15: std::cout << "取消管理员" << std::endl; break;
             case 16: std::cout << "踢人" << std::endl; break;
             case 17: std::cout << "群聊成员" << std::endl; break;
-            case 18: std::cout << "群成员申请列表" << std::endl; break;
+            case 18: addSomeoneToGroup(client); break;
             case 19: std::cout << "发送文件" << std::endl; break;
             case 20: std::cout << "查看文件" << std::endl; break;
             case 21: std::cout << "接收文件" << std::endl; break;
@@ -254,6 +264,7 @@ void tellServerWantToLookBlockList(Client &client){
 }
 
 void displayRequestList(json &js){
+    std::cout << "好友申请列表:" << std::endl;
     std::vector<std::string> vec = js["requests"];
     for(std::string &str : vec){
         json js = json::parse(str);
@@ -262,6 +273,7 @@ void displayRequestList(json &js){
 }
 
 void displayFriendList(json &js){
+    std::cout << "好友列表:" << std::endl;
     std::vector<std::string> vec = js["friends"];
     for(std::string &str : vec){
         json js = json::parse(str);
@@ -270,6 +282,7 @@ void displayFriendList(json &js){
 }
 
 void displayBlockList(json &js){
+    std::cout << "屏蔽列表:" << std::endl;
     std::vector<std::string> vec = js["blocks"];
     for(std::string &str : vec){
         json js = json::parse(str);
@@ -337,7 +350,100 @@ void handlePrivateChat(json &js){
     std::cout << time << " " << from_name << "说: " << msg << std::endl;
 }
 
+void createGroup(Client& client){
+    std::cout << "请输入群名: " << std::endl;
+    std::string groupname;
+    std::cin >> groupname;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = CREATE_GROUP;
+    response["groupname"] = groupname;
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void tellServerWantToLookAllGroupList(Client &client){
+    json response;
+    response["msgid"] = DISPLAY_ALLGROUP_LIST;
+    client.send(response.dump().append("\r\n"));
+}
+
+void displayAllGroupList(json &js){
+    std::cout << "群组列表:" << std::endl;
+    std::vector<std::string> vec = js["groups"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << "id:" << js["id"] << " name:" << js["name"] << std::endl;
+    }
+}
+
+void requestEnterGroup(Client &client){
+    tellServerWantToLookAllGroupList(client);
+    
+    std::cout << "请输入要加入的群id: " << std::endl;
+
+    std::string groupid;
+    std::cin >> groupid;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = REQUEST_GROUP;
+    response["add_group_id"] = std::stoi(groupid);
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void tellServerWantToLookGroupRequestList(Client &client, int groupid){
+    json response;
+    response["msgid"] = GROUP_REQUEST_LIST;
+    response["groupid"] = groupid;
+    client.send(response.dump().append("\r\n"));
+}
+
+void displayGroupRequestList(json &js){
+    std::cout << "群聊人员申请列表:" << std::endl;
+    std::vector<std::string> vec = js["requests"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << "id:" << js["id"] << " name:" << js["name"] << std::endl;
+    }
+}
+
+void addSomeoneToGroup(Client &client){
+    sem_init(&add_someone_to_group, 0, 0);
+
+    tellServerWantToLookAllGroupList(client);
+    std::cout << "请输入要查看的群id: " << std::endl;
+
+
+    std::string groupid;
+    std::cin >> groupid;
+    clearInputBuffer();
+
+    tellServerWantToLookGroupRequestList(client, std::stoi(groupid));
+
+    sem_wait(&add_someone_to_group);
+
+    if(!if_master_ormanager){
+        return;
+    }
+    std::cout << "请输入要加入的用户id: " << std::endl;
+
+    std::string userid;
+    std::cin >> userid;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = ADD_GROUP;
+    response["groupid"] = std::stoi(groupid);
+    response["userid"] = std::stoi(userid);
+
+    client.send(response.dump().append("\r\n"));
+}
+
 void ExitChatRoom(){
     sem_destroy(&login_sem);
+    sem_destroy(&add_someone_to_group);
     exit(EXIT_SUCCESS);
 }
