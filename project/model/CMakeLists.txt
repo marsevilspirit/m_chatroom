@@ -2,6 +2,8 @@ add_library(model
     user.h 
     usermodel.h
     usermodel.cc
+    friendmodel.h 
+    friendmodel.cc
 )
 
 target_link_libraries(model)

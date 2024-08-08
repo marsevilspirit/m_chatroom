@@ -8,6 +8,7 @@
 #include <cassert>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 namespace mars {
 
@@ -31,6 +32,13 @@ public:
     size_t prependableBytes() const {return m_readIndex;}
 
     const char* peek() const {return begin() + m_readIndex;}
+
+    const char* findCRLF() const
+    {
+        // FIXME: replace with memmem()?
+        const char* crlf = std::search(peek(), beginWrite(), kCRLF, kCRLF+2);
+        return crlf == beginWrite() ? NULL : crlf;
+    }
 
     void swap(Buffer& rhs){
         m_buffer.swap(rhs.m_buffer);
@@ -93,6 +101,9 @@ public:
         std::copy(d, d+len, begin()+m_readIndex);
     }
 
+    const char* beginWrite() const
+    { return begin() + m_writeIndex; }
+
     ssize_t readFd(int, int* savedErrno);//todo
 
     char* beginWrite() {return begin() + m_writeIndex;}
@@ -118,6 +129,8 @@ private:
     std::vector<char> m_buffer;
     size_t m_readIndex;
     size_t m_writeIndex;
+
+    static const char kCRLF[];
 };
 
 }

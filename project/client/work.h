@@ -6,7 +6,9 @@
 #include <functional>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 
+#include "../model/user.h"
 #include "../m_netlib/Net/TcpConnection.h"
 #include "../json.hpp"
 
@@ -23,7 +25,7 @@ public:
     // 获取单例对象
     static Work* getInstance();
 
-    void needEnter(const TcpConnectionPtr &conn, json &js, Timestamp time);
+    void enterChatroom();    
 
     // 注册消息以及对应的回调操作
     void reg(const TcpConnectionPtr &conn, Timestamp time);
@@ -32,12 +34,26 @@ public:
 
     void enterChatroom(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void addFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void displayFriendList() const;
+    
+    void deleteFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void privateChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void receivePrivateChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void friendOptions(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     // 获取消息对应的处理器
     MsgHandler getHandler(int msgid);
 
 private:
     Work();
 
+    User m_currentUser;
+    std::vector<User> m_friendList;
     std::unordered_map<int, MsgHandler> m_handlersMap;
 };
 

@@ -10,6 +10,7 @@
 #include "../model/usermodel.h"
 #include "../m_netlib/Net/TcpConnection.h"
 #include "../json.hpp"
+#include "../model/friendmodel.h"
 
 using json = nlohmann::json;
 
@@ -34,7 +35,15 @@ public:
 
     void login(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
-    void tempEcho(const TcpConnectionPtr &conn, json &js, Timestamp time);
+    void CallBack(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
@@ -49,9 +58,11 @@ private:
 
     std::unordered_map<int, MsgHandler> m_handlersMap;
     std::unordered_map<int, TcpConnectionPtr> m_userConnMap;
+    std::unordered_map<TcpConnectionPtr, int> m_connUserMap;
     std::mutex m_connMutex;
 
     UserModel m_userModel;
+    FriendModel m_friendModel;
 };
 
 #endif //MARS_SERVICE_H

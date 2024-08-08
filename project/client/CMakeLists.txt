@@ -1,10 +1,10 @@
 add_library(client
     client.cc 
     client.h
-    work.cc 
-    work.h
     util.cc
     util.h
+    clientService.cc 
+    clientService.h
 )
 
 target_link_libraries(client -lssl -lcrypto)

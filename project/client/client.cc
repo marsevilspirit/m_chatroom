@@ -1,7 +1,7 @@
 #include "client.h"
 #include "../m_netlib/Log/mars_logger.h"
 #include "../json.hpp"
-#include "work.h"
+#include "clientService.h"
 
 using namespace mars;
 using namespace mars::net;
@@ -10,10 +10,11 @@ using namespace mars::base;
 using json = nlohmann::json;
 
 Client::Client(EventLoop *loop, const InetAddress &serverAddr)
-    : m_client(loop, serverAddr)
+    : m_client(loop, serverAddr),
+      m_codec(std::bind(&Client::onJsonMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
 {
     m_client.setConnectionCallback(std::bind(&Client::onConnection, this, std::placeholders::_1));
-    m_client.setMessageCallback(std::bind(&Client::onMessage, this, std::placeholders::_1, std::placeholders::_2));
+    m_client.setMessageCallback(std::bind(&JsonCodec::onMessage, &m_codec, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
 void Client::onConnection(const TcpConnectionPtr &conn)
@@ -21,6 +22,7 @@ void Client::onConnection(const TcpConnectionPtr &conn)
     if (conn->connected())
     {
         LogDebug("onConnection(): new connection [{}] from {}", conn->name().c_str(), conn->peerAddress().toHostPort().c_str());
+        m_connection = conn;
     }
     else
     {
@@ -37,10 +39,9 @@ void Client::onMessage(const TcpConnectionPtr &conn, Buffer *buf)
 
     json js = json::parse(str);
 
-    // 通过消息id获取对应的处理器
-    int msgid = js["msgid"].get<int>();
-    auto msgHandler = Work::getInstance()->getHandler(msgid);
+}
 
-    // 回调消息对应的处理器
-    msgHandler(conn, js, Timestamp::now());
+void Client::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    handleServerMessage(js, time);
 }

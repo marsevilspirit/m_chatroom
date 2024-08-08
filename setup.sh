@@ -14,4 +14,3 @@ mv chatroom ./Chatroom
 mv chatclient ./Chatclient
 
 cp ../project/m_netlib/Log/logconf.json ./Chatroom/logconf.json
-cp ../project/m_netlib/Log/logconf.json ./Chatclient/logconf.json

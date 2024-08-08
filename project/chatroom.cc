@@ -12,7 +12,7 @@ int main()
     signal(SIGINT, resetHandler);
 
     EventLoop loop;
-    InetAddress listenAddr(7777);
+    InetAddress listenAddr(8888);
     Server server(&loop, listenAddr);
 
     server.start();

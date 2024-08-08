@@ -20,10 +20,10 @@ public:
     void setPwd(std::string pwd) { m_password = pwd; }
     void setState(std::string state) { m_state = state; }
 
-    int getId() { return m_id; }
-    std::string getName() { return m_name; }
+    int getId() const { return m_id; }
+    std::string getName() const { return m_name; }
     std::string getPwd() { return m_password; }
-    std::string getState() { return m_state; }
+    std::string getState() const { return m_state; }
 
 protected:
     int m_id;

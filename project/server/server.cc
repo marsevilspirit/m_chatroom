@@ -9,16 +9,16 @@
 
 using namespace mars;
 using namespace mars::net;
-using namespace mars::base;
 
 using json = nlohmann::json;
 
 Server::Server(EventLoop *loop, const InetAddress &listenAddr)
     : m_server(loop, listenAddr),
-      m_loop(loop)
+      m_loop(loop),
+      m_codec(std::bind(&Server::onJsonMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
 {
     m_server.setConnectionCallback(std::bind(&Server::onConnection, this, std::placeholders::_1));
-    m_server.setMessageCallback(std::bind(&Server::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    m_server.setMessageCallback(std::bind(&JsonCodec::onMessage, &m_codec, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     m_server.setThreadNum(4);
 }
@@ -33,7 +33,7 @@ void Server::onConnection(const TcpConnectionPtr &conn)
     if (conn->connected())
     {
         std::cout << "onConnection(): new connection [" << conn->name() << "] from " << conn->peerAddress().toHostPort() << std::endl;
-        Service::getInstance()->needEnter(conn, Timestamp::now());
+        //Service::getInstance()->needEnter(conn, Timestamp::now());
     }
     else
     {
@@ -57,4 +57,16 @@ void Server::onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time
 
     // 回调消息对应的处理器
     msgHandler(conn, js, time);
+}
+
+void Server::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    std::cout << "msg:" << js.dump() << std::endl;
+
+    // 通过消息id获取对应的处理器
+    int msgid = js["msgid"].get<int>();
+    auto JsonMsgHandler = Service::getInstance()->getHandler(msgid);
+
+    // 回调消息对应的处理器
+    JsonMsgHandler(conn, js, time);
 }
