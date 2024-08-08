@@ -25,8 +25,6 @@ public:
     // 获取单例对象
     static Service* getInstance();
 
-    void needEnter(const TcpConnectionPtr &conn, Timestamp time);
-
     // 想要进入房间
     void wantEnter(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
@@ -35,15 +33,23 @@ public:
 
     void login(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
-    void CallBack(const TcpConnectionPtr &conn, json &js, Timestamp time);
-
     void handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     void handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     void handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void handleDisplayFriendList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     void handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleBlockFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleUnBlockFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleBlockFriendList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);

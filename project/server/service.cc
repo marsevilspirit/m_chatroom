@@ -18,7 +18,12 @@ Service::Service(){
     m_handlersMap[ADD_FRIEND] = std::bind(&Service::handleAddFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[DELETE_FRIEND] = std::bind(&Service::handleDeleteFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[PRIVATE_CHAT] = std::bind(&Service::handlePrivateChat, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[DISPLAY_FRIEND_LIST] = std::bind(&Service::handleDisplayFriendList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[FRIEND_REQUEST_LIST] = std::bind(&Service::handleFriendRequestList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[BLOCK_FRIEND] = std::bind(&Service::handleBlockFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[UNBLOCK_FRIEND] = std::bind(&Service::handleUnBlockFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[BLOCK_FRIEND_LIST] = std::bind(&Service::handleBlockFriendList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[CHECK_BLOCK] = std::bind(&Service::handleCheckBlock, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 }
 
 void Service::reset() {
@@ -88,28 +93,6 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
             response["id"] = user.getId();
             response["name"] = user.getName();
 
-            std::vector<User> userVec = m_friendModel.query(user.getId());
-            if (!userVec.empty()){
-                std::vector<std::string> vec2;
-                for (User &each_user : userVec)
-                {
-                    json js;       //把userVec里面的好友信息，遍历放到json里，再插入到vec2
-                    js["friend_id"] = each_user.getId();
-                    js["friend_name"] = each_user.getName();
-                    js["friend_state"] = each_user.getState();
-                    vec2.push_back(js.dump());
-
-                    if(each_user.getState() == "online")
-                    {
-                        json res_update_state;
-                        res_update_state["msgid"] = FRIEND_ONLINE;
-                        res_update_state["id"] = user.getId();
-                        m_userConnMap[each_user.getId()]->send(res_update_state.dump().append("\r\n"));
-                    }
-                }
-                response["friends"] = vec2;
-            }
-
             conn->send(response.dump().append("\r\n"));
         }
     } else { // 不存在
@@ -154,18 +137,9 @@ void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp 
         from_response["friend_name"] = add_name;
         from_response["friend_state"] = m_userModel.query(to_id).getState();
         conn->send(from_response.dump().append("\r\n"));
-        std::cout << "from_id"<< from_id << " is " << from_response["friend_state"] << std::endl;
         if (from_response["friend_state"] == "online")
         {
-            std::cout << "update to_id " << to_id << "friend list" << std::endl;
-            User from_user = m_userModel.query(from_id);
-            json to_response;
-            to_response["msgid"] = UPDATE_FRIEND_LIST;
-            to_response["friend_id"] = from_id;
-            to_response["friend_name"] = from_user.getName();
-            to_response["friend_state"] = from_user.getState();
-
-            m_userConnMap[to_id]->send(to_response.dump().append("\r\n"));
+            //todo
         }
         return;
     }
@@ -185,14 +159,6 @@ void Service::handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timesta
     if (state1 == "friend" && state2 == "friend")
     {
         m_friendModel.deleteEach(from_id, to_id);
-        json response;
-        response["msgid"] = DELETE_FRIEND_SUCCESS;
-        response["id"] = to_id;
-        conn->send(response.dump().append("\r\n"));
-        json response2;
-        response2["msgid"] = DELETED_FRIEND_SUCCESS;
-        response2["id"] = from_id;
-        m_userConnMap[delete_id]->send(response2.dump().append("\r\n"));
         return;
     } else {
         json response;
@@ -201,23 +167,130 @@ void Service::handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timesta
     }
 }
 
+void Service::handleBlockFriend(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int block_id = js["block_id"];
+    int user_id = m_connUserMap[conn]; 
+
+    std::string state1 = m_friendModel.getState(user_id, block_id);
+
+    if (state1 == "friend")
+    {
+        m_friendModel.modify(user_id, block_id, "block");
+        json response;
+        response["msgid"] = BLOCK_FRIEND_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+    } else {
+        json response;
+        response["msgid"] = BLOCK_FRIEND_FAIL;
+        conn->send(response.dump().append("\r\n"));
+    }
+}
+
+void Service::handleUnBlockFriend(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int unblock_id = js["unblock_id"];
+    int user_id = m_connUserMap[conn]; 
+
+    std::string state1 = m_friendModel.getState(user_id, unblock_id);
+
+    if (state1 == "block")
+    {
+        m_friendModel.modify(user_id, unblock_id, "friend");
+        json response;
+        response["msgid"] = UNBLOCK_FRIEND_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+    } else {
+        json response;
+        response["msgid"] = UNBLOCK_FRIEND_FAIL;
+        conn->send(response.dump().append("\r\n"));
+    }
+}
+
+void Service::handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int check_id = js["check_id"];
+    int user_id = m_connUserMap[conn]; 
+
+    std::cout << "check_id:" << check_id << " user_id:" << user_id << '\n';
+
+    std::string state1 = m_friendModel.getState(user_id, check_id);
+    std::string state2 = m_friendModel.getState(check_id, user_id);
+
+    json response;
+    response["msgid"] = CHECK_BLOCK;
+    response["state1"] = state1;
+    response["state2"] = state2;
+    conn->send(response.dump().append("\r\n"));
+
+    auto it = m_userConnMap.find(check_id);
+    if (it != m_userConnMap.end())
+    {
+        it->second->send(response.dump().append("\r\n"));
+    } else {
+        std::cout << "m_userConnMap is null" << std::endl;
+    }
+}
+
+void Service::handleBlockFriendList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int user_id = m_connUserMap[conn];
+    std::vector<User> userVec = m_friendModel.blockQuery(user_id);
+
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = BLOCK_FRIEND_LIST;
+    response["blocks"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
 void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestamp time){
     std::string msg = js["msg"];
+    std::string from_name = js["from_name"];
     int to_id = js["id"];
-
-    std::cout << "msg: " << js["msg"] << " to " << js["id"] << '\n' << '\n';
 
     json response;
     response["msgid"] = PRIVATE_CHAT;
     response["msg"] = msg;
+    response["from_name"] = from_name;
+    response["time"] = time.toFormattedString();
 
-    m_userConnMap[to_id]->send(response.dump().append("\r\n"));
+    auto it = m_userConnMap.find(to_id); 
+    if (it != m_userConnMap.end())
+    {
+        TcpConnectionPtr to_conn = it->second;
+        to_conn->send(response.dump().append("\r\n"));
+    } else {
+        // 对方不在线
+        // 存储离线消息
+    }
+}
+
+void Service::handleDisplayFriendList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int id = m_connUserMap[conn];
+    std::vector<User> userVec = m_friendModel.query(id);
+
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        js["state"] = user.getState();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_FRIEND_LIST;
+    response["friends"] = vec;
+    conn->send(response.dump().append("\r\n"));
 }
 
 void Service::handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time){
-
-    std::cout << "handleFriendRequestList" << std::endl;
-
     int id = m_connUserMap[conn];
     std::vector<User> userVec = m_friendModel.requestQuery(id);
 
@@ -230,8 +303,6 @@ void Service::handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Ti
         vec.push_back(js.dump());
     }
 
-    std::cout << "vec size:" << vec.size() << std::endl;
-
     for(std::string &str : vec){
         std::cout << str << std::endl;
     }
@@ -241,6 +312,8 @@ void Service::handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Ti
     response["requests"] = vec;
     conn->send(response.dump().append("\r\n"));
 }
+
+
 
 // 处理客户端异常退出
 void Service::clientCloseException(const TcpConnectionPtr &conn){

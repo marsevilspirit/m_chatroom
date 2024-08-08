@@ -43,5 +43,5 @@ void Client::onMessage(const TcpConnectionPtr &conn, Buffer *buf)
 
 void Client::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp time)
 {
-    handleServerMessage(js, time);
+    handleServerMessage(this, js, time);
 }

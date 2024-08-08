@@ -6,7 +6,7 @@
 #include "client.h"
 #include "../m_netlib/Base/Timestamp.h"
 
-void handleServerMessage(json &js, Timestamp time);
+void handleServerMessage(Client* client, json &js, Timestamp time);
 
 void UserInit(json &js);
 
@@ -20,19 +20,31 @@ void EnterCommandMenu(Client &client);
 
 void addFriend(Client &client);
 
-void updateFriendList(json &js);
-
 void deleteFriend(Client &client);
 
-void deleteOneFriendList(json &js);
+void blockFriend(Client &client);
+
+void unblockFriend(Client &client);
 
 void tellServerWantToLookRequestList(Client& client);
 
+void tellServerWantToLookFriendList(Client& client);
+
+void tellServerWantToLookBlockList(Client &client);
+
+void displayFriendList(json &js);
+
 void displayRequestList(json &js);
 
-void handleFriendOnline(json &js);
+void displayBlockList(json &js);
+
+void checkIfBlock(Client &client, int id_to_chat);
+
+void checkIfBlock(Client* client, int id_to_chat);
 
 void privateChat(Client &client);
+
+void handlePrivateChat(json &js);
 
 void ExitChatRoom();
 

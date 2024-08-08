@@ -1,4 +1,5 @@
 #include "clientService.h"
+#include "client.h"
 #include "util.h"
 #include "../public.h"
 #include "../model/user.h"
@@ -10,22 +11,11 @@
 
 sem_t login_sem;
 std::atomic<bool> login_flag(false);
+std::atomic<bool> if_block(false);
+
+std::atomic<int> private_chat_id(-1);
 
 User CurrentUser;
-std::vector<User> currentUserFriendList;
-
-static int displayFriendList() {
-    if (currentUserFriendList.empty()) {
-        std::cout << "Friend list is empty." << std::endl;
-        return 0;
-    }
-
-    std::cout << "Friend List:" << std::endl;
-    for (const auto& user : currentUserFriendList) {
-        std::cout << "id: " << user.getId() << ", Name: " << user.getName() << ", state: " << user.getState() << std::endl;
-    }
-    return 1;
-}
 
 static void clearInputBuffer() 
 {
@@ -33,7 +23,7 @@ static void clearInputBuffer()
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // 忽略剩余输入
 }
 
-void handleServerMessage(json &js, Timestamp time){
+void handleServerMessage(Client* client, json &js, Timestamp time){
     int msgid = js["msgid"].get<int>();
     switch (msgid){
         case REG_SUCCESS:        std::cout << "注册成功, 用户id:" << js["id"].get<int>() << std::endl;                                  break;
@@ -41,15 +31,21 @@ void handleServerMessage(json &js, Timestamp time){
         case LOGIN_SUCCESS:      std::cout << "登录成功" << std::endl; login_flag = true;  UserInit(js); sem_post(&login_sem);          break;
         case LOGIN_REPEAT:       std::cout << "重复登录" << std::endl; login_flag = false; sem_post(&login_sem);                        break;
         case LOGIN_FAIL:         std::cout << "登录失败, 用户名或密码错误" << std::endl; login_flag = false; sem_post(&login_sem);      break;
-        case ADD_FRIEND_SUCCESS: std::cout << "添加成功" << std::endl; updateFriendList(js); displayFriendList();                       break;
+        case ADD_FRIEND_SUCCESS: std::cout << "添加成功" << std::endl;                                                                  break;
         case ADD_FRIEND_REQUEST: std::cout << "你向对方发起好友申请" << std::endl;                                                      break;
-        case UPDATE_FRIEND_LIST: std::cout << "更新好友列表" << std::endl;  updateFriendList(js);                                       break;
-        case DELETE_FRIEND_SUCCESS: std::cout << "删除好友成功" << std::endl;  deleteOneFriendList(js);                                 break;
-        case DELETED_FRIEND_SUCCESS: std::cout << "你被一位好友删除" <<std::endl; deleteOneFriendList(js); break;
+        case UPDATE_FRIEND_LIST: std::cout << "更新好友列表" << std::endl;  break;
+        case DELETE_FRIEND_SUCCESS: std::cout << "删除好友成功" << std::endl;  break;
+        case DELETED_FRIEND_SUCCESS: std::cout << "你被一位好友删除" <<std::endl; break;
         case DELETE_FRIEND_FAIL:  std::cout << "删除好友失败，你与对方不是好友" << std::endl; break;
-        case FRIEND_ONLINE:      handleFriendOnline(js);  break;
-        case PRIVATE_CHAT:        std::cout << "msg: " << js["msg"] << std::endl; break;
+        case BLOCK_FRIEND_FAIL:  std::cout << "屏蔽好友失败，你与对方不是好友" << std::endl; break;
+        case BLOCK_FRIEND_SUCCESS: std::cout << "屏蔽好友成功" << std::endl; checkIfBlock(client, private_chat_id); break;
+        case UNBLOCK_FRIEND_FAIL:  std::cout << "解除屏蔽好友失败，你并未屏蔽对方" << std::endl; break;
+        case UNBLOCK_FRIEND_SUCCESS: std::cout << "解除屏蔽好友成功" << std::endl; checkIfBlock(client, private_chat_id); break;
+        case PRIVATE_CHAT:       handlePrivateChat(js);   break;
         case FRIEND_REQUEST_LIST: displayRequestList(js); break;
+        case DISPLAY_FRIEND_LIST: displayFriendList(js); break;
+        case BLOCK_FRIEND_LIST:  displayBlockList(js); break;
+        case CHECK_BLOCK:        if_block = (js["state1"] == "block") || (js["state2"] == "block"); std::cout << "if_block: " << if_block << std::endl;  break;
         case TEST: std::cout << "收到test json send" <<std::endl; break;
     }
 }
@@ -58,22 +54,7 @@ void UserInit(json &js){
     CurrentUser.setId(js["id"]);
     CurrentUser.setName(js["name"]);
 
-    std::cout << "当前用户 name:" << CurrentUser.getName() << " id:" << CurrentUser.getId() << std::endl;
-
-    std::cout << "好友列表:" << std::endl;
-    if(js.contains("friends")){
-        currentUserFriendList.clear();
-        std::vector<std::string> vec = js["friends"];
-        for(std::string &str : vec){
-            json js = json::parse(str);
-            User user;
-            user.setId(js["friend_id"]);
-            user.setName(js["friend_name"]);
-            user.setState(js["friend_state"]);
-            currentUserFriendList.push_back(user);
-            std::cout << "id: " << user.getId() << " name: " << user.getName() << " state: " << user.getState() << std::endl;
-        }
-    }
+    std::cout << "当前用户 name: " << CurrentUser.getName() << " id: " << CurrentUser.getId() << std::endl;
 }
 
 
@@ -169,9 +150,9 @@ void EnterCommandMenu(Client &client){
             case 2:  std::cout << "群聊" << std::endl; break;
             case 3:  addFriend(client);    break;
             case 4:  deleteFriend(client); break;
-            case 5:  std::cout << "屏蔽好友" << std::endl; break;
-            case 6:  std::cout << "解除屏蔽" << std::endl; break;
-            case 7:  displayFriendList(); break;
+            case 5:  blockFriend(client);              break;
+            case 6:  unblockFriend(client);  break;
+            case 7:  tellServerWantToLookFriendList(client); break;
             case 8:  tellServerWantToLookRequestList(client); break;
             case 9:  std::cout << "创建群聊" << std::endl;     break;
             case 10: std::cout << "申请加入群聊" << std::endl; break;
@@ -209,23 +190,8 @@ void addFriend(Client &client){
     client.send(response.dump().append("\r\n"));
 }
 
-
-void updateFriendList(json &js){
-    User user;
-    user.setId(js["friend_id"]);
-    user.setName(js["friend_name"]);
-    user.setState(js["friend_state"]);
-
-    std::cout << "id:" << user.getId() << "name:" << user.getName() << " " << user.getState() << std::endl;
-
-    currentUserFriendList.push_back(user);
-}
-
 void deleteFriend(Client &client){
-    if(displayFriendList() == 0){
-        std::cout << "没有好友可以删除\n";
-        return;
-    }
+    tellServerWantToLookFriendList(client);
 
     int id;
     std::cout << "请输入要删除的好友id:";
@@ -239,19 +205,51 @@ void deleteFriend(Client &client){
     client.send(response.dump().append("\r\n"));
 }
 
-void deleteOneFriendList(json &js) {
-    int idToDelete = js["id"].get<int>();
-    auto it = std::remove_if(currentUserFriendList.begin(), currentUserFriendList.end(),
-                             [idToDelete](const User &user) {
-                                 return user.getId() == idToDelete;
-                             });
+void blockFriend(Client& client){
+    tellServerWantToLookFriendList(client);
 
-        currentUserFriendList.erase(it, currentUserFriendList.end());
+    int id;
+    std::cout << "请输入要屏蔽的好友id:";
+    std::cin >> id;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = BLOCK_FRIEND;
+    response["block_id"] = id;
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void unblockFriend(Client& client){
+    tellServerWantToLookBlockList(client);
+
+    int id;
+    std::cout << "请输入要解除屏蔽的好友id:";
+    std::cin >> id;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = UNBLOCK_FRIEND;
+    response["unblock_id"] = id;
+
+    client.send(response.dump().append("\r\n"));
 }
 
 void tellServerWantToLookRequestList(Client &client){
     json response;
     response["msgid"] = FRIEND_REQUEST_LIST;
+    client.send(response.dump().append("\r\n"));
+}
+
+void tellServerWantToLookFriendList(Client &client){
+    json response;
+    response["msgid"] = DISPLAY_FRIEND_LIST;
+    client.send(response.dump().append("\r\n"));
+}
+
+void tellServerWantToLookBlockList(Client &client){
+    json response;
+    response["msgid"] = BLOCK_FRIEND_LIST;
     client.send(response.dump().append("\r\n"));
 }
 
@@ -263,37 +261,80 @@ void displayRequestList(json &js){
     }
 }
 
-void handleFriendOnline(json &js){
-    for(auto& user : currentUserFriendList){
-        if (user.getId() == js["id"]){
-            user.setState("online");
-            std::cout << "你的朋友" << user.getName() << "上线" << std::endl;
-        }
+void displayFriendList(json &js){
+    std::vector<std::string> vec = js["friends"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << "id:" << js["id"] << " name:" << js["name"] << " state:" << js["state"] << std::endl;
     }
 }
 
-void privateChat(Client &client){
-    displayFriendList();
+void displayBlockList(json &js){
+    std::vector<std::string> vec = js["blocks"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << "id:" << js["id"] << " name:" << js["name"] << std::endl;
+    }
+}
+
+void checkIfBlock(Client &client, int id_to_chat){
+    json response;
+    response["msgid"] = CHECK_BLOCK;
+    response["check_id"] = id_to_chat;
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void checkIfBlock(Client* client, int id_to_chat){
+    json response;
+    response["msgid"] = CHECK_BLOCK;
+    response["check_id"] = id_to_chat;
+
+    client->send(response.dump().append("\r\n"));
+}
+
+void privateChat(Client &client) {
+    tellServerWantToLookFriendList(client);
+
     std::cout << "请输入好友id:";
     int id_to_chat;
     std::cin >> id_to_chat;
+    clearInputBuffer();
     std::string msg;
     json response;
 
-    while(1){
-    
-        std::cin >> msg;
+    checkIfBlock(client, id_to_chat);
 
-        if(msg == "quit"){
+    while (!if_block) {
+
+        std::cout << "in while loop if_block: " << if_block << std::endl;
+
+        private_chat_id = id_to_chat;
+
+        std::getline(std::cin, msg);
+
+        if (msg == "exit") {
             break;
         }
 
         response["msgid"] = PRIVATE_CHAT;
         response["id"] = id_to_chat;
+        response["from_name"] = CurrentUser.getName();
         response["msg"] = msg;
 
         client.send(response.dump().append("\r\n"));
     }
+
+    if (if_block) {
+        std::cout << "你已被对方屏蔽" << std::endl;
+    }
+}
+
+void handlePrivateChat(json &js){
+    std::string from_name = js["from_name"];
+    std::string msg = js["msg"];
+    std::string time = js["time"];
+    std::cout << time << " " << from_name << "说: " << msg << std::endl;
 }
 
 void ExitChatRoom(){

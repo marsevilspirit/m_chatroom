@@ -22,6 +22,8 @@ public:
 
     std::vector<User> requestQuery(int friendid);
 
+    std::vector<User> blockQuery(int userid);
+
     std::string getState(int userid, int friendid);
 };
 
