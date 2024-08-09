@@ -4,9 +4,13 @@
 #include "../JsonCodec.h"
 #include "../model/user.h"
 #include "../model/group.h"
+#include "../model/historyCasheManager.h"
 #include <cstdio>
 #include <mutex>
+#include <string>
 #include <vector>
+
+extern std::shared_ptr<CacheManager> cacheManager;
 
 Service *Service::getInstance() {
     static Service service;
@@ -314,6 +318,8 @@ void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestam
     response["from_name"] = from_name;
     response["time"] = time.toFormattedString();
 
+    cacheManager->storePrivateMessageInCache(std::to_string(m_connUserMap[conn]), std::to_string(to_id), msg);
+
     auto it = m_userConnMap.find(to_id); 
     if (it != m_userConnMap.end())
     {
@@ -476,6 +482,8 @@ void Service::handleQuitGroup(const TcpConnectionPtr &conn, json &js, Timestamp 
     }
 
     m_groupModel.deleteGroupMember(userid, groupid);
+
+    m_groupUserListMap.find(groupid)->second.erase(std::remove(m_groupUserListMap.find(groupid)->second.begin(), m_groupUserListMap.find(groupid)->second.end(), userid), m_groupUserListMap.find(groupid)->second.end());
 
     json response;
     response["msgid"] = QUIT_GROUP_SUCCESS;
@@ -662,6 +670,8 @@ void Service::handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp 
     response["from_name"] = from_name;
     response["time"] = time.toFormattedString();
     response["groupid"] = groupid;
+
+    cacheManager->storeGroupMessageInCache(std::to_string(groupid), std::to_string(m_connUserMap[conn]), msg);
 
     for (int &userid : userVec)
     {

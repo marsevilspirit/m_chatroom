@@ -2,10 +2,12 @@
 #include "../m_netlib/Log/mars_logger.h"
 
 // 数据库配置信息
+/*
 static std::string server = "127.0.0.1";
 static std::string user = "root";
 static std::string password = "661188";
 static std::string dbname = "chatroom2";
+*/
 
 // 初始化数据库连接
 MySQL::MySQL()
@@ -23,16 +25,17 @@ MySQL::~MySQL()
 // 连接数据库
 bool MySQL::connect()
 {
-    MYSQL *p = mysql_real_connect(m_conn, server.c_str(), user.c_str(),
-                                  password.c_str(), dbname.c_str(), 3306, nullptr, 0);
+    MYSQL *p = mysql_real_connect(m_conn, "127.0.0.1", "root",
+                                  "661188", "chatroom2", 3306, nullptr, 0);
     if (p != nullptr)
     {
-        mysql_query(m_conn, "set names gbk");
+        mysql_query(m_conn, "set names utf8mb4");
         LogInfo("connect mysql success!");
     }
     else
     {
         LogInfo("connect mysql fail!");
+        LogInfo("connect mysql fail! Error: {}", mysql_error(m_conn));
     }
 
     return p;

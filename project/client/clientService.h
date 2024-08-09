@@ -33,6 +33,8 @@ void unblockFriend(Client &client);
 
 void tellServerWantToLookRequestList(Client& client);
 
+void addFriendRequest(Client &client);
+
 void tellServerWantToLookFriendList(Client& client);
 
 void tellServerWantToLookBlockList(Client &client);

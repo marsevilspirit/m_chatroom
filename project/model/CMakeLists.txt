@@ -10,6 +10,7 @@ add_library(model
     group.h
     filemodel.h
     filemodel.cc
+    historyCasheManager.h
 )
 
 target_link_libraries(model)

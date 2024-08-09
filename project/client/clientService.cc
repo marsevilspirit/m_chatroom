@@ -190,7 +190,7 @@ void EnterCommandMenu(Client &client){
             case 5:  blockFriend(client);              break;
             case 6:  unblockFriend(client);  break;
             case 7:  tellServerWantToLookFriendList(client); break;
-            case 8:  tellServerWantToLookRequestList(client); break;
+            case 8:  addFriendRequest(client); break;
             case 9:  createGroup(client);         break;
             case 10: requestEnterGroup(client);   break;
             case 11: quitGroup(client);           break;
@@ -205,6 +205,22 @@ void EnterCommandMenu(Client &client){
             case 20: viewfile(client); break;
             case 21: receivefile(client); break;
             case 22: ExitChatRoom();                  break;
+            default:
+                     std::cout << "\n";
+                     std::cout << "command界面\n";
+                     std::cout << "1.私聊        2.群聊\n";
+                     std::cout << "3.添加好友    4.删除好友\n";
+                     std::cout << "5.屏蔽好友    6.解除屏蔽\n";
+                     std::cout << "7.好友列表    8.好友申请列表\n";
+                     std::cout << "9.创建群聊    10.申请加入群聊\n";
+                     std::cout << "11.退出群聊   12.解散群聊\n";
+                     std::cout << "13.群聊列表   14.设置管理员\n";
+                     std::cout << "15.取消管理员 16.踢人\n";
+                     std::cout << "17.群聊成员表 18.群成员申请列表\n";
+                     std::cout << "19.发送文件   20.查看文件\n";
+                     std::cout << "21.接收文件   22.退出\n";
+                     std::cout << "\n";
+
         }
     }
 }
@@ -242,6 +258,32 @@ void addFriend(Client &client){
     response["add_name"] = name;
 
     client.send(response.dump().append("\r\n"));
+}
+
+
+void addFriendRequest(Client &client){
+    tellServerWantToLookRequestList(client);
+
+    std::string name;
+    std::cout << "请输入要添加的好友名(exit):";
+    std::cin >> name;
+    clearInputBuffer();
+
+    if(name == "exit"){
+        return;
+    }
+
+    if(name == CurrentUser.getName()){
+        std::cout << "不能添加自己为好友" << std::endl;
+        return;
+    }
+
+    json response;
+    response["msgid"] = ADD_FRIEND;
+    response["add_name"] = name;
+
+    client.send(response.dump().append("\r\n"));
+
 }
 
 void deleteFriend(Client &client){
@@ -310,6 +352,12 @@ void tellServerWantToLookBlockList(Client &client){
 void displayRequestList(json &js){
     std::cout << "好友申请列表:" << std::endl;
     std::vector<std::string> vec = js["requests"];
+
+    if(vec.size() == 0){
+        std::cout << "无人申请" << std::endl;
+        return;
+    }
+
     for(std::string &str : vec){
         json js = json::parse(str);
         std::cout << "id:" << js["id"] << " name:" << js["name"] << std::endl;

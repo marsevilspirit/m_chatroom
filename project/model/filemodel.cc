@@ -2,10 +2,11 @@
 #include "../database/database.h"
 
 
+// 若重复直接覆盖
 void FileModel::insertFile(int sender_id, int receiver_id, std::string file_name){
     // 1. 组装sql语句
     char sql[1024] = {0};
-    sprintf(sql, "insert into file_transfers(`filename`, `senderid`, `receiverid`) values('%s', %d, %d)", file_name.c_str(), sender_id, receiver_id);
+    sprintf(sql, "INSERT INTO file_transfers(`filename`, `senderid`, `receiverid`)  VALUES('%s', %d, %d)  ON DUPLICATE KEY UPDATE      senderid = VALUES(senderid),      receiverid = VALUES(receiverid),      created_at = NOW();", file_name.c_str(), sender_id, receiver_id);
 
     // 2. 执行sql语句
     MySQL mysql;
