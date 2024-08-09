@@ -6,6 +6,7 @@
 #include "client.h"
 #include "../m_netlib/Base/Timestamp.h"
 
+
 void handleServerMessage(Client* client, json &js, Timestamp time);
 
 void UserInit(json &js);
@@ -17,6 +18,10 @@ void reg(Client &client);
 bool login(Client &client);
 
 void EnterCommandMenu(Client &client);
+
+void tellServerWantToLookAllUserList(Client &client);
+
+void displayAllUserList(json &js);
 
 void addFriend(Client &client);
 
@@ -56,9 +61,33 @@ void requestEnterGroup(Client &client);
 
 void tellServerWantToLookGroupRequestList(Client &client, int groupid);
 
-void displayGroupRequestList(json &js);
+int displayGroupRequestList(json &js);
 
 void addSomeoneToGroup(Client &client);
+
+void quitGroup(Client &client);
+
+void tellServerShowOwnGroupList(Client &client);
+
+void displayOwnGroupList(json &js);
+
+void tellServerWantToLookGroupMemberList(Client &client, int groupid);
+
+void GroupMemberList(Client &client);
+
+void displayGroupMemberList(json &js);
+
+void setGroupManager(Client &client);
+
+void tellServerWantToSetManagerGroupMemberList(Client &client, int groupid);
+
+void cancelGroupManager(Client &client);
+
+void kickSomeoneInGroup(Client &client);
+
+void groupChat(Client &client);
+
+void handleGroupChat(json &js);
 
 void ExitChatRoom();
 

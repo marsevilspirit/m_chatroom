@@ -26,6 +26,8 @@ public:
     // 获取单例对象
     static Service* getInstance();
 
+    void groupUserListMapInit();
+
     // 想要进入房间
     void wantEnter(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
@@ -33,6 +35,8 @@ public:
     void reg(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     void login(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDisplayAllUserList(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     void handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
@@ -62,6 +66,24 @@ public:
 
     void handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void handleQuitGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleShowOwnGroupList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleShowGroupMemberList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDisplaySetManagerMemberList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleSetManager(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleCancelManager(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleCheckIfGroupMember(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
 
@@ -76,6 +98,7 @@ private:
     std::unordered_map<int, MsgHandler> m_handlersMap;
     std::unordered_map<int, TcpConnectionPtr> m_userConnMap;
     std::unordered_map<TcpConnectionPtr, int> m_connUserMap;
+    std::unordered_map<int, std::vector<int>> m_groupUserListMap;
     std::mutex m_connMutex;
 
     UserModel m_userModel;

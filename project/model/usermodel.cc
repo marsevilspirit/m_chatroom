@@ -24,6 +24,7 @@ bool UserModel::insert(User &user)
     return false;
 }
 
+
 // 根据用户号码查询用户信息
 User UserModel::query(int id)
 {
@@ -56,7 +57,6 @@ User UserModel::query(int id)
 
 User UserModel::query(std::string name)
 {
-{
     // 1.组装sql语句
     char sql[1024] = {0};
     sprintf(sql, "select * from user where name = %s", name.c_str());
@@ -84,7 +84,35 @@ User UserModel::query(std::string name)
     return User();
 }
     
+
+std::vector<User> UserModel::query(){
+    char sql[1024] = "select * from user";
+
+    std::vector<User> userVec;
+
+    MySQL mysql;
+    if (mysql.connect())
+    {
+        MYSQL_RES *res = mysql.query(sql);
+        if (res != nullptr)
+        {
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) != nullptr)
+            {
+                User user;
+                user.setId(atoi(row[0]));
+                user.setName(row[1]);
+                user.setState(row[3]);
+                userVec.push_back(user);
+            }
+            mysql_free_result(res);
+            return userVec;
+        }
+    }
+
+    return userVec;
 }
+
 
 // 更新用户的状态信息
 bool UserModel::updateState(User user)

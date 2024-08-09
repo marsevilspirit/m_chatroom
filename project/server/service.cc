@@ -13,9 +13,13 @@ Service *Service::getInstance() {
     return &service;
 }
 
+
 Service::Service(){
+    groupUserListMapInit(); 
+
     m_handlersMap[REG_MSG] = std::bind(&Service::reg, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[LOGIN_MSG] = std::bind(&Service::login, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[DISPLAY_ALLUSER_LIST] = std::bind(&Service::handleDisplayAllUserList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[ADD_FRIEND] = std::bind(&Service::handleAddFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[DELETE_FRIEND] = std::bind(&Service::handleDeleteFriend, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[PRIVATE_CHAT] = std::bind(&Service::handlePrivateChat, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
@@ -30,7 +34,29 @@ Service::Service(){
     m_handlersMap[REQUEST_GROUP] = std::bind(&Service::requestAddGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[GROUP_REQUEST_LIST] = std::bind(&Service::handleGroupRequestList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[ADD_GROUP] = std::bind(&Service::handleAddSomeoneToGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[QUIT_GROUP] = std::bind(&Service::handleQuitGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3); 
+    m_handlersMap[DISPLAY_OWN_GROUP_LIST] = std::bind(&Service::handleShowOwnGroupList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[DISPLAY_GROUP_MEMBER_LIST] = std::bind(&Service::handleShowGroupMemberList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[DISPLAY_GROUP_SET_MANAGER_MEMBER_LIST] = std::bind(&Service::handleDisplaySetManagerMemberList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[SET_MANAGER] = std::bind(&Service::handleSetManager, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[CANCEL_MANAGER] = std::bind(&Service::handleCancelManager, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[KICK_SOMEONE] = std::bind(&Service::handleKickSomeoneInGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[CHECK_GROUP_MEMBER] = std::bind(&Service::handleCheckIfGroupMember, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[GROUP_CHAT] = std::bind(&Service::handleGroupChat, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+}
 
+void Service::groupUserListMapInit(){
+    std::vector<Group> groupVec = m_groupModel.queryAllGroup();
+    for (Group &group : groupVec)
+    {
+        std::vector<User> userVec = m_groupModel.queryGroupMember(group.getId());
+        std::vector<int> vec;
+        for (User &user : userVec)
+        {
+            vec.push_back(user.getId());
+        }
+        m_groupUserListMap[group.getId()] = vec;
+    }
 }
 
 void Service::reset() {
@@ -61,7 +87,7 @@ void Service::reg(const TcpConnectionPtr &conn, json &js, Timestamp time) {
     User user;
     user.setName(name);
     user.setPwd(pwd);
-     
+
     bool state = m_userModel.insert(user);
     if (state){
         json response;
@@ -108,6 +134,24 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
         response["msg"] = "登录失败, 用户不存在";
         conn->send(response.dump().append("\r\n"));
     }
+}
+
+void Service::handleDisplayAllUserList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    std::vector<User> userVec = m_userModel.query();
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        js["state"] = user.getState();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_ALLUSER_LIST;
+    response["users"] = vec;
+    conn->send(response.dump().append("\r\n"));
 }
 
 void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp time){
@@ -409,9 +453,227 @@ void Service::handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Ti
 
     m_groupModel.modifyGroupRole(userid, groupid, "normal");
 
+    m_groupUserListMap[groupid].push_back(userid);
+
     json response;
     response["msgid"] = ADD_GROUP_SUCCESS;
     conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleQuitGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = m_connUserMap[conn];
+
+    if(m_groupModel.ifManagerOrNormal(m_connUserMap[conn], groupid) == false){
+        json response;
+        response["msgid"] = QUIT_GROUP_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    m_groupModel.deleteGroupMember(userid, groupid);
+
+    json response;
+    response["msgid"] = QUIT_GROUP_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleShowOwnGroupList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int userid = m_connUserMap[conn];
+    std::vector<Group> groupVec = m_groupModel.queryOwnGroup(userid);
+
+    std::vector<std::string> vec;
+    for (Group &group : groupVec)
+    {
+        json js;
+        js["id"] = group.getId();
+        js["name"] = group.getName();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_OWN_GROUP_LIST;
+    response["groups"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+
+void Service::handleShowGroupMemberList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+
+    if(m_groupModel.ifMasterOrManagerORnormal(m_connUserMap[conn], groupid) == false){
+        json response;
+        response["msgid"] = DISPLAY_GROUP_MEMBER_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    std::vector<User> userVec = m_groupModel.queryGroupMember(groupid);
+
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        js["role"] = user.getState();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_GROUP_MEMBER_LIST;
+    response["members"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleDisplaySetManagerMemberList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+
+    if(m_groupModel.ifMaster(m_connUserMap[conn], groupid) == false){
+        json response;
+        response["msgid"] = DISPLAY_SET_MANAGER_MEMBER_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    std::vector<User> userVec = m_groupModel.queryGroupMember(groupid);
+
+    std::vector<std::string> vec;
+    for (User &user : userVec)
+    {
+        json js;
+        js["id"] = user.getId();
+        js["name"] = user.getName();
+        js["role"] = user.getState();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_SET_MANAGER_MEMBER_LIST;
+    response["members"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleSetManager(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = js["userid"];
+
+    std::string state = m_groupModel.queryGroupRole(userid, groupid);
+
+    if(state != "normal")
+    {
+        json response;
+        response["msgid"] = SET_MANAGER_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    m_groupModel.modifyGroupRole(userid, groupid, "manager");
+
+    json response;
+    response["msgid"] = SET_MANAGER_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleCancelManager(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = js["userid"];
+
+    if(m_groupModel.ifManager(userid, groupid) == false){
+        json response;
+        response["msgid"] = CANCEL_MANAGER_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    m_groupModel.modifyGroupRole(userid, groupid, "normal");
+
+    json response;
+    response["msgid"] = CANCEL_MANAGER_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = js["userid"];
+
+    std::string kick_state = m_groupModel.queryGroupRole(m_connUserMap[conn], groupid); 
+    std::string be_kick_state = m_groupModel.queryGroupRole(userid, groupid);
+
+    if (kick_state == "master"){
+        m_groupModel.deleteGroupMember(userid, groupid);
+        m_groupUserListMap[groupid].erase(std::remove(m_groupUserListMap[groupid].begin(), m_groupUserListMap[groupid].end(), userid), m_groupUserListMap[groupid].end());
+
+        json response;
+        response["msgid"] = KICK_SOMEONE_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+    } else if(kick_state == "manager"){
+        if(be_kick_state == "manager" || be_kick_state == "master"){
+            json response;
+            response["msgid"] = KICK_SOMEONE_FAIL;
+            conn->send(response.dump().append("\r\n"));
+            return;
+        }
+        m_groupModel.deleteGroupMember(userid, groupid);
+        m_groupUserListMap[groupid].erase(std::remove(m_groupUserListMap[groupid].begin(), m_groupUserListMap[groupid].end(), userid), m_groupUserListMap[groupid].end());
+
+        json response;
+        response["msgid"] = KICK_SOMEONE_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+    } else {
+        json response;
+        response["msgid"] = KICK_SOMEONE_FAIL;
+        conn->send(response.dump().append("\r\n"));
+    }
+}
+
+void Service::handleCheckIfGroupMember(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = m_connUserMap[conn];
+
+    std::string state = m_groupModel.queryGroupRole(userid, groupid);
+
+    if(state == ""){
+        state = "not";
+    } else {
+        state = "yes";
+    }
+
+    json response;
+    response["msgid"] = CHECK_IF_GROUP_MEMBER;
+    response["state"] = state == "yes";
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    std::string msg = js["msg"];
+    std::string from_name = js["from_name"];
+    
+    std::vector<int> userVec = m_groupUserListMap[groupid];
+
+    json response;
+    response["msgid"] = GROUP_CHAT;
+    response["msg"] = msg;
+    response["from_name"] = from_name;
+    response["time"] = time.toFormattedString();
+    response["groupid"] = groupid;
+
+    for (int &userid : userVec)
+    {
+        if (userid == m_connUserMap[conn])
+        {
+            continue;
+        }
+
+        auto it = m_userConnMap.find(userid);
+        if (it != m_userConnMap.end())
+        {
+            it->second->send(response.dump().append("\r\n"));
+        } else {
+            // 存储离线消息
+        }
+    }
 }
 
 // 处理客户端异常退出

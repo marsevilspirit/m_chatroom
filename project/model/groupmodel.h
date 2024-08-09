@@ -19,9 +19,27 @@ public:
 
     std::vector<Group> queryAllGroup();
 
+    std::vector<Group> queryOwnGroup(int userid);
+
     std::vector<User> queryGroupRequest(int groupid);
 
+    std::vector<User> queryGroupMember(int groupid);
+
+    std::string queryGroupRole(int userid, int groupid);
+
+    std::string queryGroupName(int groupid);
+
+    bool ifMaster(int userid, int groupid);
+
+    bool ifManager(int userid, int groupid);
+
     bool ifMasterOrManager(int userid, int groupid);
+
+    bool ifManagerOrNormal(int userid, int groupid);
+
+    bool ifMasterOrManagerORnormal(int userid, int groupid);
+
+    void deleteGroupMember(int userid, int groupid);
 };
 
 #endif
