@@ -43,6 +43,10 @@ Service::Service(){
     m_handlersMap[KICK_SOMEONE] = std::bind(&Service::handleKickSomeoneInGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[CHECK_GROUP_MEMBER] = std::bind(&Service::handleCheckIfGroupMember, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[GROUP_CHAT] = std::bind(&Service::handleGroupChat, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[MASTER_DELETE_GROUP] = std::bind(&Service::handleMasterDeleteGroup, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[SEND_FILE_DATABASE]  = std::bind(&Service::handleSendFileDataBase, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[VIEW_FILE] = std::bind(&Service::handleDisplayFileList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[RECEIVE_FILE] = std::bind(&Service::handleReceiveFile, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 }
 
 void Service::groupUserListMapInit(){
@@ -649,7 +653,7 @@ void Service::handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp 
     int groupid = js["groupid"];
     std::string msg = js["msg"];
     std::string from_name = js["from_name"];
-    
+
     std::vector<int> userVec = m_groupUserListMap[groupid];
 
     json response;
@@ -675,6 +679,101 @@ void Service::handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp 
         }
     }
 }
+
+void Service::handleMasterDeleteGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+    int userid = m_connUserMap[conn];
+
+    if(m_groupModel.ifMaster(userid, groupid) == false){
+        json response;
+        response["msgid"] = MASTER_DELETE_GROUP_FAIL;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    m_groupModel.deleteGroup(groupid);
+    m_groupUserListMap.erase(groupid);
+
+    json response;
+    response["msgid"] = MASTER_DELETE_GROUP_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleSendFileDataBase(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int userid = js["sender"];
+    int recv_id = js["receiver"];
+    std::string filename = js["filename"];
+
+    m_fileModel.insertFile(userid, recv_id, filename);
+
+    json response;
+    response["msgid"] = SEND_FILE_DATABASE_SUCCESS;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleDisplayFileList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    std::vector<File> fileVec = m_fileModel.query(m_connUserMap[conn]);
+
+    std::vector<std::string> vec;
+    for (File &file : fileVec)
+    {
+        json js;
+        js["sender"] = file.getSenderId();
+        js["receiver"] = file.getReceiverId();
+        js["filename"] = file.getFileName();
+        js["time"] = file.getCreateTime();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = VIEW_FILE;
+    response["files"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    std::string filename = js["filename"];
+
+    std::string filePath = "./received_files/" + filename;
+
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filePath << std::endl;
+        return;
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // 发送文件元数据
+    json metadata;
+    metadata["msgid"] = SEND_FILE_SERVER; // 标识这是一个文件传输
+    metadata["filename"] = filePath.substr(filePath.find_last_of("/\\") + 1);
+    metadata["filesize"] = fileSize;
+    conn->send(metadata.dump().append("\r\n"));
+
+    // 发送文件数据
+    char buffer[40960];
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+        conn->send(std::string(buffer, file.gcount()));
+        usleep(10);
+    }
+
+    file.close();
+    std::cout << "File sent successfully." << std::endl;
+
+    // 发送传输结束标识
+    json endMessage;
+    endMessage["msgid"] = SEND_FILE_END;
+    conn->send(endMessage.dump().append("\r\n"));
+
+    json response;
+    response["msgid"] = RECEIVE_FILE_FINISH;
+    conn->send(response.dump().append("\r\n"));
+
+}
+
 
 // 处理客户端异常退出
 void Service::clientCloseException(const TcpConnectionPtr &conn){

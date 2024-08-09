@@ -6,13 +6,15 @@
 
 #include <iostream>
 #include <limits>
-#include <semaphore.h>
+#include <semaphore.h> 
 #include <atomic>
+#include <unistd.h>
 
 sem_t login_sem;
 sem_t add_someone_to_group;
 sem_t set_manager;
 sem_t check_group_member;
+sem_t receive_file;
 std::atomic<bool> login_flag(false);
 std::atomic<bool> if_block(false);
 std::atomic<bool> if_master_ormanager(false);
@@ -76,6 +78,11 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case KICK_SOMEONE_FAIL: std::cout << "踢人失败, 权限不够" << std::endl; break;
         case KICK_SOMEONE_SUCCESS: std::cout << "踢人成功" << std::endl; break;
         case CHECK_IF_GROUP_MEMBER: if_group_member = js["state"]; sem_post(&check_group_member); break;
+        case MASTER_DELETE_GROUP_FAIL: std::cout << "你没有权限解散群聊" << std::endl; break;
+        case MASTER_DELETE_GROUP_SUCCESS: std::cout << "解散群聊成功" << std::endl; break;
+        case SEND_FILE_DATABASE_SUCCESS: std::cout << "文件发送成功" << std::endl; break;
+        case VIEW_FILE: displayFileList(js); break;
+        case RECEIVE_FILE_FINISH: std::cout << "文件接收完成" << std::endl; sem_post(&receive_file); break;
         case TEST: std::cout << "收到test json send" <<std::endl; break;
     }
 }
@@ -187,16 +194,16 @@ void EnterCommandMenu(Client &client){
             case 9:  createGroup(client);         break;
             case 10: requestEnterGroup(client);   break;
             case 11: quitGroup(client);           break;
-            case 12: std::cout << "解散群聊" << std::endl; break;
+            case 12: masterDeleteGroup(client); break;
             case 13: tellServerWantToLookAllGroupList(client); break;
             case 14: setGroupManager(client);     break;
             case 15: cancelGroupManager(client);   break;
             case 16: kickSomeoneInGroup(client);   break;
             case 17: GroupMemberList(client); break;
             case 18: addSomeoneToGroup(client); break;
-            case 19: std::cout << "发送文件" << std::endl; break;
-            case 20: std::cout << "查看文件" << std::endl; break;
-            case 21: std::cout << "接收文件" << std::endl; break;
+            case 19: sendfile(client); break;
+            case 20: viewfile(client); break;
+            case 21: receivefile(client); break;
             case 22: ExitChatRoom();                  break;
         }
     }
@@ -356,9 +363,6 @@ void privateChat(Client &client) {
     checkIfBlock(client, id_to_chat);
 
     while (!if_block) {
-
-        std::cout << "in while loop if_block: " << if_block << std::endl;
-
         private_chat_id = id_to_chat;
 
         std::getline(std::cin, msg);
@@ -417,7 +421,7 @@ void displayAllGroupList(json &js){
 
 void requestEnterGroup(Client &client){
     tellServerWantToLookAllGroupList(client);
-    
+
     std::cout << "请输入要加入的群id: " << std::endl;
 
     std::string groupid;
@@ -714,6 +718,108 @@ void handleGroupChat(json &js){
     int groupid = js["groupid"];
     std::cout << time << " " << from_name << "在群" << groupid << "说: " << msg << std::endl;
 }
+
+void masterDeleteGroup(Client &client){
+    tellServerShowOwnGroupList(client);
+
+    std::cout << "请输入要解散的群id: " << std::endl;
+
+    std::string groupid;
+    std::cin >> groupid;
+    clearInputBuffer();
+
+    json response;
+    response["msgid"] = MASTER_DELETE_GROUP;
+    response["groupid"] = std::stoi(groupid);
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void sendfile(Client &client) {
+    tellServerWantToLookFriendList(client);
+
+    std::cout << "想发送给(id):" << std::endl;
+    std::string receiver_id;
+    std::cin >> receiver_id;
+
+    std::cout << "请输入文件路径: " << std::endl;
+    std::string filePath;
+    std::cin >> filePath;
+    clearInputBuffer();
+
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filePath << std::endl;
+        return;
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // 发送文件元数据
+    json metadata;
+    metadata["msgid"] = SEND_FILE; // 标识这是一个文件传输
+    metadata["filename"] = filePath.substr(filePath.find_last_of("/\\") + 1);
+    metadata["filesize"] = fileSize;
+    client.send(metadata.dump().append("\r\n"));
+
+    // 逐块发送文件数据
+    char buffer[40960];
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+        client.send(std::string(buffer, file.gcount()));
+        usleep(10);
+    }
+
+    file.close();
+    std::cout << "File sent successfully." << std::endl;
+
+    // 发送传输结束标识
+    json endMessage;
+    endMessage["msgid"] = SEND_FILE_END;
+    client.send(endMessage.dump().append("\r\n"));
+
+    json response;
+    response["msgid"] = SEND_FILE_DATABASE;
+    response["filename"] = metadata["filename"];
+    response["sender"] = CurrentUser.getId();
+    response["receiver"] = std::stoi(receiver_id);
+
+    client.send(response.dump().append("\r\n"));
+}
+
+void viewfile(Client &client) {
+    json response;
+    response["msgid"] = VIEW_FILE;
+    client.send(response.dump().append("\r\n"));
+}
+
+void displayFileList(json &js) {
+    std::cout << "文件列表:" << std::endl;
+    std::vector<std::string> vec = js["files"];
+    for (std::string &str : vec) {
+        json js = json::parse(str);
+        std::cout << "filename:" << js["filename"] << " sender:" << js["sender"] << " receiver:" << js["receiver"] << " time:" << js["time"] << std::endl;
+    }
+}
+
+void receivefile(Client &client){
+    viewfile(client);
+
+    std::cout << "接收文件(name):" << std::endl;
+    std::string filename;
+    std::cin >> filename;
+
+    json response;
+    response["msgid"] = RECEIVE_FILE;
+    response["filename"] = filename;
+    client.send(response.dump().append("\r\n"));
+
+    sem_init(&receive_file, 0, 0);
+    sem_wait(&receive_file);
+    sem_destroy(&receive_file);
+}
+
 
 void ExitChatRoom(){
     sem_destroy(&login_sem);

@@ -12,6 +12,7 @@
 #include "../json.hpp"
 #include "../model/friendmodel.h"
 #include "../model/groupmodel.h"
+#include "../model/filemodel.h"
 
 using json = nlohmann::json;
 
@@ -84,6 +85,16 @@ public:
 
     void handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void handleMasterDeleteGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleSendFile(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleSendFileDataBase(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDisplayFileList(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
 
@@ -104,6 +115,7 @@ private:
     UserModel m_userModel;
     FriendModel m_friendModel;
     GroupModel m_groupModel;
+    FileModel m_fileModel;
 };
 
 #endif //MARS_SERVICE_H

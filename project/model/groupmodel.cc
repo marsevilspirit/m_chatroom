@@ -336,3 +336,22 @@ void GroupModel::deleteGroupMember(int userid, int groupid){
     }
 }
 
+void GroupModel::deleteGroup(int groupid){
+    char sql[1024] = {0};
+    sprintf(sql, "delete from AllGroup where id = %d", groupid);
+
+    MySQL mysql;
+    if (mysql.connect())
+    {
+        mysql.update(sql);
+    }
+
+    char sql2[1024] = {0};
+    sprintf(sql2, "delete from GroupUser where groupid = %d", groupid);
+
+    MySQL mysql2;
+    if (mysql2.connect())
+    {
+        mysql2.update(sql2);
+    }
+}

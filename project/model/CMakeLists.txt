@@ -8,6 +8,8 @@ add_library(model
     groupmodel.cc 
     groupuser.h 
     group.h
+    filemodel.h
+    filemodel.cc
 )
 
 target_link_libraries(model)

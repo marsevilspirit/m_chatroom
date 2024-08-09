@@ -89,6 +89,16 @@ void groupChat(Client &client);
 
 void handleGroupChat(json &js);
 
+void masterDeleteGroup(Client &client);
+
+void sendfile(Client &client);
+
+void viewfile(Client &client);
+
+void receivefile(Client &client);
+
+void displayFileList(json &js);
+
 void ExitChatRoom();
 
 #endif //SERVER_H

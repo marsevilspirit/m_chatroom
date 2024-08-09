@@ -14,3 +14,6 @@ mv chatroom ./Chatroom
 mv chatclient ./Chatclient
 
 cp ../project/m_netlib/Log/logconf.json ./Chatroom/logconf.json
+
+cd Chatroom
+mkdir received_files

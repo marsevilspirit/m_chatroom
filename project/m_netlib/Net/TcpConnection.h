@@ -7,6 +7,7 @@
 #include "EventLoop.h"
 #include "../Socket/Socket.h"
 
+#include <any>
 #include <memory>
 
 namespace mars {
@@ -32,10 +33,15 @@ public:
 
     void connectDestroyed();
 
+    void send(Buffer* buf);
     void send(const std::string& message);
 
     void shutdown();
     void setTcpNoDelay(bool on);
+
+    void setContext(const std::any& context){ m_context = context; }
+    const std::any& getContext() const { return m_context;}
+    std::any* getMutableContext() { return &m_context; }
 
 private:
     enum StateE { kConnecting, kConnected, kDisconnecting, kDisconnected };
@@ -61,6 +67,7 @@ private:
     CloseCallback m_closeCallback;
     Buffer m_inputBuffer;
     Buffer m_outputBuffer;
+    std::any m_context;
 };
 
 } //namespace net

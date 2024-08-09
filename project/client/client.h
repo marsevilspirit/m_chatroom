@@ -20,7 +20,7 @@ public:
         m_client.connect();
     }
 
-    void send(std::string &str) {
+    void send(const std::string &str) {
         m_connection->send(str);
     }
 

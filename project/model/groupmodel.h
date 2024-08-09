@@ -40,6 +40,8 @@ public:
     bool ifMasterOrManagerORnormal(int userid, int groupid);
 
     void deleteGroupMember(int userid, int groupid);
+
+    void deleteGroup(int groupid);
 };
 
 #endif
