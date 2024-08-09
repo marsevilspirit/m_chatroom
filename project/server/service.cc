@@ -5,6 +5,7 @@
 #include "../model/user.h"
 #include "../model/group.h"
 #include "../model/historyCasheManager.h"
+#include "../model/privatechathistory.h"
 #include <cstdio>
 #include <mutex>
 #include <string>
@@ -51,6 +52,8 @@ Service::Service(){
     m_handlersMap[SEND_FILE_DATABASE]  = std::bind(&Service::handleSendFileDataBase, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[VIEW_FILE] = std::bind(&Service::handleDisplayFileList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[RECEIVE_FILE] = std::bind(&Service::handleReceiveFile, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[PRIVATE_CHAT_HISTORY] = std::bind(&Service::handleDisplayPrivateHistory, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_handlersMap[GROUP_CHAT_HISTORY] = std::bind(&Service::handleDisplayGroupHistory, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 }
 
 void Service::groupUserListMapInit(){
@@ -71,6 +74,7 @@ void Service::reset() {
     // 把online状态的用户，设置成offline
     LogWarn("server reset");
     m_userModel.resetState();
+    cacheManager->flushCacheToDatabase();  // 刷新缓存到数据库
 }
 
 MsgHandler Service::getHandler(int msgid) {
@@ -782,6 +786,51 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     response["msgid"] = RECEIVE_FILE_FINISH;
     conn->send(response.dump().append("\r\n"));
 
+}
+
+void Service::handleDisplayPrivateHistory(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int userid = m_connUserMap[conn];
+    int friendid = js["id"];
+
+    std::vector<PrivateChatHistory> historyVec = m_historyModel.queryPrivateHistory(userid, friendid, 50);
+
+    std::vector<std::string> vec;
+    for (PrivateChatHistory &history : historyVec)
+    {
+        json js;
+        js["from"] = history.getSenderId();
+        js["to"] = history.getReceiverId();
+        js["msg"] = history.getMessage();
+        js["time"] = history.getSendTime();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_PRIVATE_HISTORY;
+    response["history"] = vec;
+    conn->send(response.dump().append("\r\n"));
+}
+
+void Service::handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    int groupid = js["groupid"];
+
+    std::vector<GroupChatHistory> historyVec = m_historyModel.queryGroupHistory(groupid, 50);
+
+    std::vector<std::string> vec;
+    for (GroupChatHistory &history : historyVec)
+    {
+        json js;
+        js["from"] = history.getSenderId();
+        js["groupid"] = history.getGroupId();
+        js["msg"] = history.getMessage();
+        js["time"] = history.getSendTime();
+        vec.push_back(js.dump());
+    }
+
+    json response;
+    response["msgid"] = DISPLAY_GROUP_HISTORY;
+    response["history"] = vec;
+    conn->send(response.dump().append("\r\n"));
 }
 
 

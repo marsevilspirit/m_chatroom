@@ -13,6 +13,7 @@
 #include "../model/friendmodel.h"
 #include "../model/groupmodel.h"
 #include "../model/filemodel.h"
+#include "../model/historymodel.h"
 
 using json = nlohmann::json;
 
@@ -95,6 +96,10 @@ public:
 
     void handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void handleDisplayPrivateHistory(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
+    void handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, Timestamp time);
+
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
 
@@ -116,6 +121,7 @@ private:
     FriendModel m_friendModel;
     GroupModel m_groupModel;
     FileModel m_fileModel;
+    HistoryModel m_historyModel;
 };
 
 #endif //MARS_SERVICE_H

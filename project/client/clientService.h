@@ -101,6 +101,14 @@ void receivefile(Client &client);
 
 void displayFileList(json &js);
 
+void tellServerWantToLookPrivateChatHistory(Client &client, int id_to_chat);
+
+void displayPrivateChatHistory(json &js);
+
+void tellServerWantToLookGroupChatHistory(Client &client, int groupid);
+
+void displayGroupChatHistory(json &js);
+
 void ExitChatRoom();
 
 #endif //SERVER_H

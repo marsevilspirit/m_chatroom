@@ -72,9 +72,6 @@ private:
     void flushPrivateChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
         for (const auto &record_str : cachedMessages) {
-
-            std::cout << "record_str: " << record_str << std::endl;
-
             // 使用 nlohmann::json 解析 JSON 字符串
             json record = json::parse(record_str);
 

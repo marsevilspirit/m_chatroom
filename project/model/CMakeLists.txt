@@ -11,6 +11,10 @@ add_library(model
     filemodel.h
     filemodel.cc
     historyCasheManager.h
+    historymodel.h 
+    historymodel.cc
+    privatechathistory.h
+    groupchathistory.h
 )
 
 target_link_libraries(model)

@@ -83,7 +83,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case SEND_FILE_DATABASE_SUCCESS: std::cout << "文件发送成功" << std::endl; break;
         case VIEW_FILE: displayFileList(js); break;
         case RECEIVE_FILE_FINISH: std::cout << "文件接收完成" << std::endl; sem_post(&receive_file); break;
-        case TEST: std::cout << "收到test json send" <<std::endl; break;
+        case DISPLAY_PRIVATE_HISTORY: displayPrivateChatHistory(js); break;
+        case DISPLAY_GROUP_HISTORY: displayGroupChatHistory(js); break;
     }
 }
 
@@ -398,6 +399,14 @@ void checkIfBlock(Client* client, int id_to_chat){
     client->send(response.dump().append("\r\n"));
 }
 
+void tellServerWantToLookPrivateChatHistory(Client &client, int id_to_chat){
+    json response;
+    response["msgid"] = PRIVATE_CHAT_HISTORY;
+    response["id"] = id_to_chat;
+
+    client.send(response.dump().append("\r\n"));
+}
+
 void privateChat(Client &client) {
     tellServerWantToLookFriendList(client);
 
@@ -410,8 +419,17 @@ void privateChat(Client &client) {
 
     checkIfBlock(client, id_to_chat);
 
+    bool if_display_private_history = true;
+
     while (!if_block) {
         private_chat_id = id_to_chat;
+
+        if(if_display_private_history){
+            std::cout << "历史记录:" << std::endl;
+            tellServerWantToLookPrivateChatHistory(client, id_to_chat);
+            usleep(1000);
+            if_display_private_history = false;
+        }
 
         std::getline(std::cin, msg);
 
@@ -743,7 +761,17 @@ void groupChat(Client& client){
     std::string msg;
     json response;
 
+    bool if_display_group_history = true;
+
     while(1){
+
+        if(if_display_group_history){
+            std::cout << "历史记录:" << std::endl;
+            tellServerWantToLookGroupChatHistory(client, std::stoi(groupid));
+            usleep(1000);
+            if_display_group_history = false;
+        }
+
         std::getline(std::cin, msg);
 
         if(msg == "exit"){
@@ -868,6 +896,28 @@ void receivefile(Client &client){
     sem_destroy(&receive_file);
 }
 
+void displayPrivateChatHistory(json &js){
+    std::vector<std::string> vec = js["history"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << js["time"] << " " << js["from"] <<" 对 " << js["to"] << "说: \n" << js["msg"] << std::endl;
+    }
+}
+
+void tellServerWantToLookGroupChatHistory(Client &client, int groupid){
+    json response;
+    response["msgid"] = GROUP_CHAT_HISTORY;
+    response["groupid"] = groupid;
+    client.send(response.dump().append("\r\n"));
+}
+
+void displayGroupChatHistory(json &js){
+    std::vector<std::string> vec = js["history"];
+    for(std::string &str : vec){
+        json js = json::parse(str);
+        std::cout << js["time"] << " " << js["from"] << "在群" << js["groupid"] << "说: \n" << js["msg"] << std::endl;
+    }
+}
 
 void ExitChatRoom(){
     sem_destroy(&login_sem);
