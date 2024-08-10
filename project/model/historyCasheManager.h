@@ -76,6 +76,10 @@ private:
     void flushPrivateChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
 
+        if (cachedMessages.empty()) {
+            return;
+        }
+
         for (const auto &record_str : cachedMessages) {
             // 使用 nlohmann::json 解析 JSON 字符串
             json record = json::parse(record_str);
@@ -90,8 +94,6 @@ private:
             sprintf(sql, "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
                 sender_id.c_str(), receiver_id.c_str(), message.c_str(), timestamp.c_str());
 
-            std::cout << "private chat sql: " << sql << "\n";
-
             if (!mysql.update(sql)) {
                 LogInfo("Failed to insert private message into MySQL");
             }
@@ -102,6 +104,11 @@ private:
 
     void flushGroupChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("group_chat_cache", 0, -1);
+
+        if (cachedMessages.empty()) {
+            return;
+        }
+
         for (const auto &record_str : cachedMessages) {
             // 使用 nlohmann::json 解析 JSON 字符串
             json record = json::parse(record_str);

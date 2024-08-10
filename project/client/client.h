@@ -24,6 +24,14 @@ public:
         m_connection->send(str);
     }
 
+    void disconnect()
+    {
+        if (m_connection)
+        {
+            m_connection->shutdown();  // 关闭连接的写端，主动断开连接
+        }
+    }
+
 private:
     void onConnection(const TcpConnectionPtr &conn);
     void onMessage(const TcpConnectionPtr &conn, Buffer *buf);

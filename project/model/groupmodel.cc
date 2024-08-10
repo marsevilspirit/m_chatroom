@@ -141,8 +141,6 @@ std::vector<User> GroupModel::queryGroupMember(int groupid){
 
     std::vector<User> userVec;
 
-    std::cout << "queryGroupMember sql: " << sql << std::endl;
-
     MySQL mysql;
     if (mysql.connect())
     {
@@ -157,7 +155,6 @@ std::vector<User> GroupModel::queryGroupMember(int groupid){
                 user.setName(row[1]);
                 user.setState(row[2]);
                 userVec.push_back(user);
-                std::cout << "id: " << user.getId() << " name: " << user.getName() << " state: " << user.getState() << std::endl;
             }
             mysql_free_result(res);
             return userVec;

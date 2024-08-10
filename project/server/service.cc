@@ -20,8 +20,6 @@ Service *Service::getInstance() {
 
 
 Service::Service(){
-    groupUserListMapInit(); 
-
     m_handlersMap[REG_MSG] = std::bind(&Service::reg, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[LOGIN_MSG] = std::bind(&Service::login, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_handlersMap[DISPLAY_ALLUSER_LIST] = std::bind(&Service::handleDisplayAllUserList, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
@@ -128,6 +126,7 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
 
             m_userConnMap[user.getId()] = conn;
             m_connUserMap[conn] = user.getId();
+            m_connStatusMap[conn] = true;
 
             user.setState("online");
             m_userModel.updateState(user);
@@ -437,6 +436,7 @@ void Service::handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Tim
         return;
     }
 
+    std::cout << "444" << std::endl;
     std::vector<User> userVec = m_groupModel.queryGroupRequest(groupid);
 
     std::vector<std::string> vec;
@@ -760,6 +760,8 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     size_t fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
+    m_userConnMap.erase(m_connUserMap[conn]); // 防止发送文件时，群聊信息干扰
+
     // 发送文件元数据
     json metadata;
     metadata["msgid"] = SEND_FILE_SERVER; // 标识这是一个文件传输
@@ -776,6 +778,8 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
 
     file.close();
     std::cout << "File sent successfully." << std::endl;
+
+    m_userConnMap[m_connUserMap[conn]] = conn;
 
     // 发送传输结束标识
     json endMessage;
@@ -839,9 +843,48 @@ void Service::handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, 
     conn->send(response.dump().append("\r\n"));
 }
 
+void Service::checkIfConnAlive(){
+    std::lock_guard<std::mutex> lock(m_connMutex);
+    
+    if(m_connStatusMap.size() == 0){
+        return;
+    }
+
+    for (auto it = m_connStatusMap.begin(); it != m_connStatusMap.end(); ++it)
+    {
+        if (it->second == false)
+        {
+            int id = m_connUserMap[it->first];
+            std::cout << "心跳检测到用户 " << id << " 掉线\n";
+
+            json response;
+            response["msgid"] = CLIENT_LONGTIME_EXIT;
+            m_userConnMap[id]->send(response.dump().append("\r\n"));
+
+            it->first->shutdown();
+            m_userConnMap.erase(id);
+            m_connUserMap.erase(it->first);
+            m_connStatusMap.erase(it->first);
+
+            User user = m_userModel.query(id);
+            user.setState("offline");
+            m_userModel.updateState(user);
+        }
+        else
+        {
+            it->second = false;
+        }
+
+        if(m_connStatusMap.size() == 0){
+            break;
+        }
+    }
+}
 
 // 处理客户端异常退出
-void Service::clientCloseException(const TcpConnectionPtr &conn){
+void Service::clientClose(const TcpConnectionPtr &conn){
+    std::cout << "client close" << std::endl;
+
     User user;
     {
         std::lock_guard<std::mutex> lock(m_connMutex);
@@ -853,6 +896,7 @@ void Service::clientCloseException(const TcpConnectionPtr &conn){
                 user.setId(it->first);
                 m_userConnMap.erase(it);
                 m_connUserMap.erase(it->second);
+                m_connStatusMap.erase(it->second);
                 break;
             }
         }

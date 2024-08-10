@@ -21,6 +21,8 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr)
     m_server.setMessageCallback(std::bind(&JsonCodec::onMessage, &m_codec, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     m_server.setThreadNum(4);
+
+    Service::getInstance()->groupUserListMapInit();
 }
 
 void Server::start()
@@ -38,7 +40,7 @@ void Server::onConnection(const TcpConnectionPtr &conn)
     else
     {
         std::cout << "onConnection(): connection [" << conn->name() << "] is down" << std::endl;
-        Service::getInstance()->clientCloseException(conn);
+        Service::getInstance()->clientClose(conn);
         conn->shutdown();
     }
 }
@@ -61,6 +63,8 @@ void Server::onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time
 
 void Server::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp time)
 {
+    Service::getInstance()->setConnStatus(conn, true);
+
     std::cout << "msg:" << js.dump() << std::endl;
 
     // 通过消息id获取对应的处理器

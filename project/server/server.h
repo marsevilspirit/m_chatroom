@@ -3,6 +3,7 @@
 
 #include "../m_netlib/Net/TcpServer.h"
 #include "../m_netlib/Net/EventLoop.h"
+#include "../m_netlib/Base/noncopyable.h"
 #include "../JsonCodec.h"
 
 
@@ -10,7 +11,7 @@ using namespace mars;
 using namespace mars::net;
 using json = nlohmann::json;
 
-class Server{
+class Server : noncopyable{
 public:
     Server(EventLoop* loop, const InetAddress& listenAddr);
     void start();

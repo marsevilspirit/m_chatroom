@@ -11,12 +11,17 @@
 #include <unistd.h>
 
 sem_t login_sem;
+sem_t show_all_user_list;
+sem_t show_friend_list;
+sem_t show_block_list;
 sem_t add_someone_to_group;
 sem_t set_manager;
 sem_t check_group_member;
 sem_t receive_file;
+sem_t check_if_block;
 std::atomic<bool> login_flag(false);
 std::atomic<bool> if_block(false);
+std::atomic<bool> if_friend(false);
 std::atomic<bool> if_master_ormanager(false);
 std::atomic<bool> if_master(false);
 std::atomic<bool> if_group_member(false);
@@ -39,7 +44,7 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case LOGIN_SUCCESS:      std::cout << "登录成功" << std::endl; login_flag = true;  UserInit(js); sem_post(&login_sem);          break;
         case LOGIN_REPEAT:       std::cout << "重复登录" << std::endl; login_flag = false; sem_post(&login_sem);                        break;
         case LOGIN_FAIL:         std::cout << "登录失败, 用户名或密码错误" << std::endl; login_flag = false; sem_post(&login_sem);      break;
-        case DISPLAY_ALLUSER_LIST: displayAllUserList(js); break;
+        case DISPLAY_ALLUSER_LIST: displayAllUserList(js); sem_post(&show_all_user_list); break;
         case ADD_FRIEND_SUCCESS: std::cout << "添加成功" << std::endl;                                                                  break;
         case ADD_FRIEND_REQUEST: std::cout << "你向对方发起好友申请" << std::endl;                                                      break;
         case UPDATE_FRIEND_LIST: std::cout << "更新好友列表" << std::endl;  break;
@@ -53,9 +58,9 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case PRIVATE_CHAT:       handlePrivateChat(js);   break;
         case GROUP_CHAT:         handleGroupChat(js); break;
         case FRIEND_REQUEST_LIST: displayRequestList(js); break;
-        case DISPLAY_FRIEND_LIST: displayFriendList(js); break;
-        case BLOCK_FRIEND_LIST:  displayBlockList(js); break;
-        case CHECK_BLOCK:        if_block = (js["state1"] == "block") || (js["state2"] == "block"); std::cout << "if_block: " << if_block << std::endl;  break;
+        case DISPLAY_FRIEND_LIST: displayFriendList(js); sem_post(&show_friend_list); break;
+        case BLOCK_FRIEND_LIST:  displayBlockList(js); sem_post(&show_block_list); break;
+        case CHECK_BLOCK:        if_block = (js["state1"] == "block") || (js["state2"] == "block"); if_friend = (js["state1"] == "friend") || (js["state2"] == "friend") || if_block; sem_post(&check_if_block); break;
         case CREATE_GROUP_SUCCESS: std::cout << "创建群聊成功" << std::endl; break;
         case CREATE_GROUP_FAIL: std::cout << "创建群聊失败" << std::endl; break;
         case DISPLAY_ALLGROUP_LIST: displayAllGroupList(js); break;
@@ -85,6 +90,7 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case RECEIVE_FILE_FINISH: std::cout << "文件接收完成" << std::endl; sem_post(&receive_file); break;
         case DISPLAY_PRIVATE_HISTORY: displayPrivateChatHistory(js); break;
         case DISPLAY_GROUP_HISTORY: displayGroupChatHistory(js); break;
+        case CLIENT_LONGTIME_EXIT: std::cout << "你太长时间未操作，服务器断开连接" << std::endl; client->disconnect(); ExitChatRoom(); break;
     }
 }
 
@@ -95,10 +101,21 @@ void UserInit(json &js){
     std::cout << "当前用户 name: " << CurrentUser.getName() << " id: " << CurrentUser.getId() << std::endl;
 }
 
+static void semInit(){
+    sem_init(&login_sem, 0, 0);
+    sem_init(&add_someone_to_group, 0, 0);
+    sem_init(&set_manager, 0, 0);
+    sem_init(&check_group_member, 0, 0);
+    sem_init(&receive_file, 0, 0);
+    sem_init(&show_all_user_list, 0, 0);
+    sem_init(&show_friend_list, 0, 0);
+    sem_init(&check_if_block, 0, 0);
+    sem_init(&show_block_list, 0, 0);
+}
+
 
 void EnterChatRoom(Client &client){
-
-    sem_init(&login_sem, 0, 0);
+    semInit();
 
     while(1)
     {
@@ -244,10 +261,16 @@ void displayAllUserList(json &js){
 void addFriend(Client &client){
     tellServerWantToLookAllUserList(client);
 
+    sem_wait(&show_all_user_list);
+
     std::string name;
-    std::cout << "请输入要添加的好友名:";
+    std::cout << "请输入要添加的好友名(exit退出):";
     std::cin >> name;
     clearInputBuffer();
+
+    if(name == "exit"){
+        return;
+    }
 
     if(name == CurrentUser.getName()){
         std::cout << "不能添加自己为好友" << std::endl;
@@ -266,7 +289,7 @@ void addFriendRequest(Client &client){
     tellServerWantToLookRequestList(client);
 
     std::string name;
-    std::cout << "请输入要添加的好友名(exit):";
+    std::cout << "请输入要添加的好友名(exit退出):";
     std::cin >> name;
     clearInputBuffer();
 
@@ -289,11 +312,16 @@ void addFriendRequest(Client &client){
 
 void deleteFriend(Client &client){
     tellServerWantToLookFriendList(client);
+    sem_wait(&show_friend_list);
 
     int id;
-    std::cout << "请输入要删除的好友id:";
+    std::cout << "请输入要删除的好友id(-1退出):";
     std::cin >> id;
     clearInputBuffer();
+
+    if(id == -1){
+        return;
+    }
 
     json response;
     response["msgid"] = DELETE_FRIEND;
@@ -304,11 +332,16 @@ void deleteFriend(Client &client){
 
 void blockFriend(Client& client){
     tellServerWantToLookFriendList(client);
+    sem_wait(&show_friend_list);
 
     int id;
-    std::cout << "请输入要屏蔽的好友id:";
+    std::cout << "请输入要屏蔽的好友id(-1退出):";
     std::cin >> id;
     clearInputBuffer();
+
+    if(id == -1){
+        return;
+    }
 
     json response;
     response["msgid"] = BLOCK_FRIEND;
@@ -319,11 +352,16 @@ void blockFriend(Client& client){
 
 void unblockFriend(Client& client){
     tellServerWantToLookBlockList(client);
+    sem_wait(&show_block_list);
 
     int id;
-    std::cout << "请输入要解除屏蔽的好友id:";
+    std::cout << "请输入要解除屏蔽的好友id(-1退出):";
     std::cin >> id;
     clearInputBuffer();
+
+    if(id == -1){
+        return;
+    }
 
     json response;
     response["msgid"] = UNBLOCK_FRIEND;
@@ -409,15 +447,28 @@ void tellServerWantToLookPrivateChatHistory(Client &client, int id_to_chat){
 
 void privateChat(Client &client) {
     tellServerWantToLookFriendList(client);
+    sem_wait(&show_friend_list);
 
-    std::cout << "请输入好友id:";
+    std::cout << "请输入好友id(-1退出):";
     int id_to_chat;
     std::cin >> id_to_chat;
     clearInputBuffer();
+
+    if(id_to_chat == -1){
+        return;
+    }
+
     std::string msg;
     json response;
 
+    if_friend = false;
     checkIfBlock(client, id_to_chat);
+    sem_wait(&check_if_block);
+
+    if(!if_friend) {
+        std::cout << "你与对方不是好友" << std::endl;
+        return;
+    }
 
     bool if_display_private_history = true;
 
@@ -526,7 +577,6 @@ int displayGroupRequestList(json &js){
 }
 
 void addSomeoneToGroup(Client &client){
-    sem_init(&add_someone_to_group, 0, 0);
 
     tellServerWantToLookAllGroupList(client);
     std::cout << "请输入要查看的群id: " << std::endl;
@@ -625,7 +675,6 @@ void tellServerWantToSetManagerGroupMemberList(Client &client, int groupid){
 }
 
 void setGroupManager(Client &client){
-    sem_init(&set_manager, 0, 0);
 
     tellServerShowOwnGroupList(client);
 
@@ -639,7 +688,6 @@ void setGroupManager(Client &client){
 
     sem_wait(&set_manager);
 
-    sem_destroy(&set_manager);
 
     if(!if_master){
         return;
@@ -665,8 +713,6 @@ void setGroupManager(Client &client){
 }
 
 void cancelGroupManager(Client &client){
-    sem_init(&set_manager, 0, 0);
-
     tellServerShowOwnGroupList(client);
 
     std::cout << "请输入要取消管理员的群id: " << std::endl;
@@ -678,8 +724,6 @@ void cancelGroupManager(Client &client){
     tellServerWantToSetManagerGroupMemberList(client, std::stoi(groupid));
 
     sem_wait(&set_manager);
-
-    sem_destroy(&set_manager);
 
     if(!if_master){
         return;
@@ -738,18 +782,20 @@ static void checkIfGroupMember(Client &client, int groupid){
 }
 
 void groupChat(Client& client){
-    sem_init(&check_group_member, 0, 0);
     tellServerShowOwnGroupList(client);
 
-    std::cout << "请输入群id: " << std::endl;
+    std::cout << "请输入群id(-1退出): " << std::endl;
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
 
+    if(groupid == "-1"){
+        return;
+    }
+
     checkIfGroupMember(client, std::stoi(groupid));
 
     sem_wait(&check_group_member);
-    sem_destroy(&check_group_member);
 
     if(!if_group_member){
         std::cout << "你不是群成员" << std::endl;
@@ -813,6 +859,7 @@ void masterDeleteGroup(Client &client){
 
 void sendfile(Client &client) {
     tellServerWantToLookFriendList(client);
+    sem_wait(&show_friend_list);
 
     std::cout << "想发送给(id):" << std::endl;
     std::string receiver_id;
@@ -891,9 +938,7 @@ void receivefile(Client &client){
     response["filename"] = filename;
     client.send(response.dump().append("\r\n"));
 
-    sem_init(&receive_file, 0, 0);
     sem_wait(&receive_file);
-    sem_destroy(&receive_file);
 }
 
 void displayPrivateChatHistory(json &js){
@@ -922,5 +967,12 @@ void displayGroupChatHistory(json &js){
 void ExitChatRoom(){
     sem_destroy(&login_sem);
     sem_destroy(&add_someone_to_group);
+    sem_destroy(&set_manager);
+    sem_destroy(&check_group_member);
+    sem_destroy(&receive_file);
+    sem_destroy(&show_all_user_list);
+    sem_destroy(&show_friend_list);
+    sem_destroy(&check_if_block);
+    sem_destroy(&show_block_list);
     exit(EXIT_SUCCESS);
 }

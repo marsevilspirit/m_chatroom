@@ -100,14 +100,21 @@ public:
 
     void handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
-    // 处理客户端异常退出
-    void clientCloseException(const TcpConnectionPtr &conn);
+    void checkIfConnAlive();
+
+    // 处理客户端退出
+    void clientClose(const TcpConnectionPtr &conn);
 
     // 重置
     void reset();
 
     // 获取消息对应的处理器
     MsgHandler getHandler(int msgid);
+
+    void setConnStatus(const TcpConnectionPtr &conn, bool status){
+        std::lock_guard<std::mutex> lock(m_connMutex);
+        m_connStatusMap[conn] = status;
+    }
 private:
     Service();
 
@@ -115,6 +122,7 @@ private:
     std::unordered_map<int, TcpConnectionPtr> m_userConnMap;
     std::unordered_map<TcpConnectionPtr, int> m_connUserMap;
     std::unordered_map<int, std::vector<int>> m_groupUserListMap;
+    std::unordered_map<TcpConnectionPtr, bool> m_connStatusMap;
     std::mutex m_connMutex;
 
     UserModel m_userModel;
