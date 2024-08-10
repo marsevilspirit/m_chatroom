@@ -805,6 +805,9 @@ void Service::handleDisplayPrivateHistory(const TcpConnectionPtr &conn, json &js
         vec.push_back(js.dump());
     }
 
+    // 逆转向量顺序
+    std::reverse(vec.begin(), vec.end());
+
     json response;
     response["msgid"] = DISPLAY_PRIVATE_HISTORY;
     response["history"] = vec;
@@ -826,6 +829,9 @@ void Service::handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, 
         js["time"] = history.getSendTime();
         vec.push_back(js.dump());
     }
+
+    // 逆转向量顺序
+    std::reverse(vec.begin(), vec.end());
 
     json response;
     response["msgid"] = DISPLAY_GROUP_HISTORY;

@@ -30,6 +30,8 @@ public:
 
         std::string chat_record_str = chat_record.dump(); // 将 JSON 对象序列化为字符串
 
+        std::cout << "private chat record: " << chat_record_str << "\n";
+
         if (!redis.rpush("private_chat_cache", chat_record_str)) {
             LogInfo("Failed to store private message in Redis cache");
         }
@@ -44,6 +46,8 @@ public:
         chat_record["timestamp"] = getCurrentTimestamp();
 
         std::string chat_record_str = chat_record.dump(); // 将 JSON 对象序列化为字符串
+
+        std::cout << "group chat record: " << chat_record_str << "\n";
 
         if (!redis.rpush("group_chat_cache", chat_record_str)) {
             LogInfo("Failed to store group message in Redis cache");
@@ -71,6 +75,7 @@ private:
 
     void flushPrivateChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
+
         for (const auto &record_str : cachedMessages) {
             // 使用 nlohmann::json 解析 JSON 字符串
             json record = json::parse(record_str);
@@ -84,12 +89,15 @@ private:
             char sql[1024];
             sprintf(sql, "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
                 sender_id.c_str(), receiver_id.c_str(), message.c_str(), timestamp.c_str());
+
+            std::cout << "private chat sql: " << sql << "\n";
+
             if (!mysql.update(sql)) {
                 LogInfo("Failed to insert private message into MySQL");
             }
         }
         // 清空 Redis 缓存
-        redis.ltrim("private_chat_cache", -1, 0);
+        redis.ltrim("private_chat_cache", 1, 0);
     }
 
     void flushGroupChatCache() {
@@ -112,6 +120,6 @@ private:
             }
         }
         // 清空 Redis 缓存
-        redis.ltrim("group_chat_cache", -1, 0);
+        redis.ltrim("group_chat_cache", 1, 0);
     }
 };
