@@ -419,10 +419,15 @@ void Service::requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp 
     int groupid = js["add_group_id"];
     int userid = m_connUserMap[conn];
 
-    m_groupModel.addGroup(userid, groupid, "request");
-
     json response;
-    response["msgid"] = REQUEST_GROUP_SUCCESS;
+
+    if(m_groupModel.addGroup(userid, groupid, "request")){
+        response["msgid"] = REQUEST_GROUP_SUCCESS;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+    response["msgid"] = REQUEST_GROUP_FAIL;
     conn->send(response.dump().append("\r\n"));
 }
 
@@ -845,7 +850,7 @@ void Service::handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, 
 
 void Service::checkIfConnAlive(){
     std::lock_guard<std::mutex> lock(m_connMutex);
-    
+
     if(m_connStatusMap.size() == 0){
         return;
     }

@@ -13,7 +13,7 @@ public:
     // 创建群组
     bool createGroup(Group &group);
     // 加入群组
-    void addGroup(int userid, int groupid, std::string role);
+    bool addGroup(int userid, int groupid, std::string role);
 
     void modifyGroupRole(int userid, int groupid, std::string role);
 

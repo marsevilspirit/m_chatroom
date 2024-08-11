@@ -24,18 +24,22 @@ bool GroupModel::createGroup(Group &group)
 }
 
 // 加入群组
-void GroupModel::addGroup(int userid, int groupid, std::string role)
+bool GroupModel::addGroup(int userid, int groupid, std::string role)
 {
     // 1.组装sql语句
     char sql[1024] = {0};
     sprintf(sql, "insert into GroupUser values(%d, %d, '%s')",
             groupid, userid, role.c_str());
 
+    bool success{false};    
+
     MySQL mysql;
     if (mysql.connect())
     {
-        mysql.update(sql);
+        success = mysql.update(sql);
     }
+
+    return success;
 }
 
 void GroupModel::modifyGroupRole(int userid, int groupid, std::string role){

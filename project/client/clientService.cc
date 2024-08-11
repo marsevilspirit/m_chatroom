@@ -14,11 +14,16 @@ sem_t login_sem;
 sem_t show_all_user_list;
 sem_t show_friend_list;
 sem_t show_block_list;
+sem_t show_request_list;
+sem_t show_own_group_list;
+sem_t show_all_group_list;
+sem_t show_file_list;
 sem_t add_someone_to_group;
 sem_t set_manager;
 sem_t check_group_member;
 sem_t receive_file;
 sem_t check_if_block;
+
 std::atomic<bool> login_flag(false);
 std::atomic<bool> if_block(false);
 std::atomic<bool> if_friend(false);
@@ -39,58 +44,141 @@ static void clearInputBuffer()
 void handleServerMessage(Client* client, json &js, Timestamp time){
     int msgid = js["msgid"].get<int>();
     switch (msgid){
-        case REG_SUCCESS:        std::cout << "注册成功, 用户id:" << js["id"].get<int>() << std::endl;                                  break;
-        case REG_FAIL:           std::cout << "注册失败, 用户名已存在" << std::endl;                                                    break;
-        case LOGIN_SUCCESS:      std::cout << "登录成功" << std::endl; login_flag = true;  UserInit(js); sem_post(&login_sem);          break;
-        case LOGIN_REPEAT:       std::cout << "重复登录" << std::endl; login_flag = false; sem_post(&login_sem);                        break;
-        case LOGIN_FAIL:         std::cout << "登录失败, 用户名或密码错误" << std::endl; login_flag = false; sem_post(&login_sem);      break;
-        case DISPLAY_ALLUSER_LIST: displayAllUserList(js); sem_post(&show_all_user_list); break;
-        case ADD_FRIEND_SUCCESS: std::cout << "添加成功" << std::endl;                                                                  break;
-        case ADD_FRIEND_REQUEST: std::cout << "你向对方发起好友申请" << std::endl;                                                      break;
-        case UPDATE_FRIEND_LIST: std::cout << "更新好友列表" << std::endl;  break;
-        case DELETE_FRIEND_SUCCESS: std::cout << "删除好友成功" << std::endl;  break;
-        case DELETED_FRIEND_SUCCESS: std::cout << "你被一位好友删除" <<std::endl; break;
-        case DELETE_FRIEND_FAIL:  std::cout << "删除好友失败，你与对方不是好友" << std::endl; break;
-        case BLOCK_FRIEND_FAIL:  std::cout << "屏蔽好友失败，你与对方不是好友" << std::endl; break;
-        case BLOCK_FRIEND_SUCCESS: std::cout << "屏蔽好友成功" << std::endl; checkIfBlock(client, private_chat_id); break;
-        case UNBLOCK_FRIEND_FAIL:  std::cout << "解除屏蔽好友失败，你并未屏蔽对方" << std::endl; break;
-        case UNBLOCK_FRIEND_SUCCESS: std::cout << "解除屏蔽好友成功" << std::endl; checkIfBlock(client, private_chat_id); break;
-        case PRIVATE_CHAT:       handlePrivateChat(js);   break;
-        case GROUP_CHAT:         handleGroupChat(js); break;
-        case FRIEND_REQUEST_LIST: displayRequestList(js); break;
-        case DISPLAY_FRIEND_LIST: displayFriendList(js); sem_post(&show_friend_list); break;
-        case BLOCK_FRIEND_LIST:  displayBlockList(js); sem_post(&show_block_list); break;
-        case CHECK_BLOCK:        if_block = (js["state1"] == "block") || (js["state2"] == "block"); if_friend = (js["state1"] == "friend") || (js["state2"] == "friend") || if_block; sem_post(&check_if_block); break;
-        case CREATE_GROUP_SUCCESS: std::cout << "创建群聊成功" << std::endl; break;
-        case CREATE_GROUP_FAIL: std::cout << "创建群聊失败" << std::endl; break;
-        case DISPLAY_ALLGROUP_LIST: displayAllGroupList(js); break;
-        case REQUEST_GROUP_SUCCESS: std::cout << "提交加入群聊申请成功" << std::endl; break;
-        case DISPLAY_GROUP_REQUEST: if_master_ormanager = displayGroupRequestList(js); sem_post(&add_someone_to_group);  break;
-        case DISPLAY_GROUP_REQUEST_FAIL: std::cout << "你不是群主或管理员" << std::endl;if_master_ormanager = false; sem_post(&add_someone_to_group); break;
-        case ADD_GROUP_SUCCESS: std::cout << "添加群成员成功" << std::endl; break;
-        case ADD_GROUP_FAIL: std::cout << "添加群成员失败" << std::endl; break;
-        case QUIT_GROUP_FAIL: std::cout << "退出群聊失败" << std::endl; break;
-        case QUIT_GROUP_SUCCESS: std::cout << "退出群聊成功" << std::endl; break;
-        case DISPLAY_OWN_GROUP_LIST: displayOwnGroupList(js); break;
-        case DISPLAY_GROUP_MEMBER_LIST: displayGroupMemberList(js); break;
-        case DISPLAY_GROUP_MEMBER_FAIL: std::cout << "你不是群成员" << std::endl; break;
-        case DISPLAY_SET_MANAGER_MEMBER_FAIL: std::cout << "你不是群主" << std::endl; if_master = false; sem_post(&set_manager); break;
-        case DISPLAY_SET_MANAGER_MEMBER_LIST: displayGroupMemberList(js); if_master = true; sem_post(&set_manager); break;
-        case SET_MANAGER_SUCCESS: std::cout << "设置管理员成功" << std::endl; break;
-        case SET_MANAGER_FAIL: std::cout << "设置管理员失败" << std::endl; break;
-        case CANCEL_MANAGER_FAIL: std::cout << "对方不是管理员" << std::endl; break;
-        case CANCEL_MANAGER_SUCCESS: std::cout << "取消管理员成功" << std::endl; break;
-        case KICK_SOMEONE_FAIL: std::cout << "踢人失败, 权限不够" << std::endl; break;
-        case KICK_SOMEONE_SUCCESS: std::cout << "踢人成功" << std::endl; break;
-        case CHECK_IF_GROUP_MEMBER: if_group_member = js["state"]; sem_post(&check_group_member); break;
-        case MASTER_DELETE_GROUP_FAIL: std::cout << "你没有权限解散群聊" << std::endl; break;
-        case MASTER_DELETE_GROUP_SUCCESS: std::cout << "解散群聊成功" << std::endl; break;
-        case SEND_FILE_DATABASE_SUCCESS: std::cout << "文件发送成功" << std::endl; break;
-        case VIEW_FILE: displayFileList(js); break;
-        case RECEIVE_FILE_FINISH: std::cout << "文件接收完成" << std::endl; sem_post(&receive_file); break;
-        case DISPLAY_PRIVATE_HISTORY: displayPrivateChatHistory(js); break;
-        case DISPLAY_GROUP_HISTORY: displayGroupChatHistory(js); break;
-        case CLIENT_LONGTIME_EXIT: std::cout << "你太长时间未操作，服务器断开连接" << std::endl; client->disconnect(); ExitChatRoom(); break;
+        case REG_SUCCESS:                       std::cout << "注册成功, 用户id:" << js["id"] << std::endl;                         
+                                                break;
+        case REG_FAIL:                          std::cout << "注册失败, 用户名已存在" << std::endl;                                
+                                                break;
+        case LOGIN_SUCCESS:                     std::cout << "登录成功" << std::endl; 
+                                                login_flag = true;  
+                                                UserInit(js); 
+                                                sem_post(&login_sem);                                                              
+                                                break;
+        case LOGIN_REPEAT:                      std::cout << "重复登录" << std::endl; 
+                                                login_flag = false; 
+                                                sem_post(&login_sem);                                                              
+                                                break;
+        case LOGIN_FAIL:                        std::cout << "登录失败, 用户名或密码错误" << std::endl; 
+                                                login_flag = false; 
+                                                sem_post(&login_sem);                                                              
+                                                break;
+        case DISPLAY_ALLUSER_LIST:              displayAllUserList(js); 
+                                                sem_post(&show_all_user_list);                                                   
+                                                break;
+        case ADD_FRIEND_SUCCESS:                std::cout << "添加成功" << std::endl;                                              
+                                                break;
+        case ADD_FRIEND_REQUEST:                std::cout << "你向对方发起好友申请" << std::endl;                                  
+                                                break;
+        case UPDATE_FRIEND_LIST:                std::cout << "更新好友列表" << std::endl;                                          
+                                                break;
+        case DELETE_FRIEND_SUCCESS:             std::cout << "删除好友成功" << std::endl;                                       
+                                                break;
+        case DELETED_FRIEND_SUCCESS:            std::cout << "你被一位好友删除" <<std::endl;                                   
+                                                break;
+        case DELETE_FRIEND_FAIL:                std::cout << "删除好友失败，你与对方不是好友" << std::endl;                       
+                                                break;
+        case BLOCK_FRIEND_FAIL:                 std::cout << "屏蔽好友失败，你与对方不是好友" << std::endl;                        
+                                                break;
+        case BLOCK_FRIEND_SUCCESS:              std::cout << "屏蔽好友成功" << std::endl; 
+                                                checkIfBlock(client, private_chat_id);                                           
+                                                break;
+        case UNBLOCK_FRIEND_FAIL:               std::cout << "解除屏蔽好友失败，你并未屏蔽对方" << std::endl;                    
+                                                break;
+        case UNBLOCK_FRIEND_SUCCESS:            std::cout << "解除屏蔽好友成功" << std::endl; 
+                                                checkIfBlock(client, private_chat_id);                                         
+                                                break;
+        case PRIVATE_CHAT:                      handlePrivateChat(js);                                                             
+                                                break;
+        case GROUP_CHAT:                        handleGroupChat(js);                                                               
+                                                break;
+        case FRIEND_REQUEST_LIST:               displayRequestList(js); 
+                                                sem_post(&show_request_list);                                                     
+                                                break;
+        case DISPLAY_FRIEND_LIST:               displayFriendList(js); 
+                                                sem_post(&show_friend_list);                                                      
+                                                break;
+        case BLOCK_FRIEND_LIST:                 displayBlockList(js); 
+                                                sem_post(&show_block_list);                                                        
+                                                break;
+        case CHECK_BLOCK:                       if_block = (js["state1"] == "block") || (js["state2"] == "block"); 
+                                                if_friend = (js["state1"] == "friend") || (js["state2"] == "friend") || if_block; 
+                                                sem_post(&check_if_block);                                                         
+                                                break;
+        case CREATE_GROUP_SUCCESS:              std::cout << "创建群聊成功" << std::endl;                                        
+                                                break;
+        case CREATE_GROUP_FAIL:                 std::cout << "创建群聊失败, 已有同名群聊" << std::endl;                             
+                                                break;
+        case DISPLAY_ALLGROUP_LIST:             displayAllGroupList(js); 
+                                                sem_post(&show_all_group_list);                                                 
+                                                break;
+        case REQUEST_GROUP_SUCCESS:             std::cout << "提交加入群聊申请成功" << std::endl;                               
+                                                break;
+        case REQUEST_GROUP_FAIL:                std::cout << "提交加入群聊申请失败" << std::endl;                                  
+                                                break;
+        case DISPLAY_GROUP_REQUEST:             if_master_ormanager = displayGroupRequestList(js); 
+                                                sem_post(&add_someone_to_group);                                                
+                                                break;
+        case DISPLAY_GROUP_REQUEST_FAIL:        std::cout << "你不是群主或管理员" << std::endl;
+                                                if_master_ormanager = false; 
+                                                sem_post(&add_someone_to_group);                                           
+                                                break;
+        case ADD_GROUP_SUCCESS:                 std::cout << "添加群成员成功" << std::endl;                                         
+                                                break;
+        case ADD_GROUP_FAIL:                    std::cout << "添加群成员失败" << std::endl;                                            
+                                                break;
+        case QUIT_GROUP_FAIL:                   std::cout << "退出群聊失败" << std::endl;                                             
+                                                break;
+        case QUIT_GROUP_SUCCESS:                std::cout << "退出群聊成功" << std::endl;                                          
+                                                break;
+        case DISPLAY_OWN_GROUP_LIST:            displayOwnGroupList(js); 
+                                                sem_post(&show_own_group_list);                                                
+                                                break;
+        case DISPLAY_GROUP_MEMBER_LIST:         displayGroupMemberList(js);                                                 
+                                                break;
+        case DISPLAY_GROUP_MEMBER_FAIL:         std::cout << "你不是群成员" << std::endl;                                   
+                                                break;
+        case DISPLAY_SET_MANAGER_MEMBER_FAIL:   std::cout << "你不是群主" << std::endl; 
+                                                if_master = false; 
+                                                sem_post(&set_manager);                                               
+                                                break;
+        case DISPLAY_SET_MANAGER_MEMBER_LIST:   displayGroupMemberList(js); 
+                                                if_master = true; 
+                                                sem_post(&set_manager);                                               
+                                                break;
+        case SET_MANAGER_SUCCESS:               std::cout << "设置管理员成功" << std::endl;                                       
+                                                break;
+        case SET_MANAGER_FAIL:                  std::cout << "设置管理员失败" << std::endl;                                          
+                                                break;
+        case CANCEL_MANAGER_FAIL:               std::cout << "对方不是管理员" << std::endl;                                       
+                                                break;
+        case CANCEL_MANAGER_SUCCESS:            std::cout << "取消管理员成功" << std::endl; 
+                                                break;
+        case KICK_SOMEONE_FAIL:                 std::cout << "踢人失败, 权限不够" << std::endl; 
+                                                break;
+        case KICK_SOMEONE_SUCCESS:              std::cout << "踢人成功" << std::endl; 
+                                                break;
+        case CHECK_IF_GROUP_MEMBER:             if_group_member = js["state"]; 
+                                                sem_post(&check_group_member); 
+                                                break;
+        case MASTER_DELETE_GROUP_FAIL:          std::cout << "你没有权限解散群聊" << std::endl; 
+                                                break;
+        case MASTER_DELETE_GROUP_SUCCESS:       std::cout << "解散群聊成功" << std::endl; 
+                                                break;
+        case SEND_FILE_DATABASE_SUCCESS:        std::cout << "文件发送成功" << std::endl; 
+                                                break;
+        case VIEW_FILE:                         displayFileList(js); 
+                                                sem_post(&show_file_list); 
+                                                break;
+        case RECEIVE_FILE_FINISH:               std::cout << "文件接收完成" << std::endl; 
+                                                sem_post(&receive_file); 
+                                                break;
+        case DISPLAY_PRIVATE_HISTORY:           displayPrivateChatHistory(js); 
+                                                break;
+        case DISPLAY_GROUP_HISTORY:             displayGroupChatHistory(js); 
+                                                break;
+        case CLIENT_LONGTIME_EXIT:              std::cout << "你太长时间未操作，服务器断开连接" << std::endl; 
+                                                client->disconnect(); 
+                                                ExitChatRoom();                                                      
+                                                break;
     }
 }
 
@@ -109,8 +197,12 @@ static void semInit(){
     sem_init(&receive_file, 0, 0);
     sem_init(&show_all_user_list, 0, 0);
     sem_init(&show_friend_list, 0, 0);
+    sem_init(&show_request_list, 0, 0);
     sem_init(&check_if_block, 0, 0);
     sem_init(&show_block_list, 0, 0);
+    sem_init(&show_own_group_list, 0, 0);
+    sem_init(&show_all_group_list, 0, 0);
+    sem_init(&show_file_list, 0, 0);
 }
 
 
@@ -201,28 +293,30 @@ void EnterCommandMenu(Client &client){
         clearInputBuffer();
 
         switch (choice){
-            case 1:  privateChat(client);              break;
-            case 2:  groupChat(client);    break;
-            case 3:  addFriend(client);    break;
-            case 4:  deleteFriend(client); break;
-            case 5:  blockFriend(client);              break;
-            case 6:  unblockFriend(client);  break;
-            case 7:  tellServerWantToLookFriendList(client); break;
-            case 8:  addFriendRequest(client); break;
-            case 9:  createGroup(client);         break;
-            case 10: requestEnterGroup(client);   break;
-            case 11: quitGroup(client);           break;
-            case 12: masterDeleteGroup(client); break;
-            case 13: tellServerWantToLookAllGroupList(client); break;
-            case 14: setGroupManager(client);     break;
-            case 15: cancelGroupManager(client);   break;
-            case 16: kickSomeoneInGroup(client);   break;
-            case 17: GroupMemberList(client); break;
-            case 18: addSomeoneToGroup(client); break;
-            case 19: sendfile(client); break;
-            case 20: viewfile(client); break;
-            case 21: receivefile(client); break;
-            case 22: ExitChatRoom();                  break;
+            case 1:  privateChat(client);                           break;
+            case 2:  groupChat(client);                             break;
+            case 3:  addFriend(client);                             break;
+            case 4:  deleteFriend(client);                          break;
+            case 5:  blockFriend(client);                           break;
+            case 6:  unblockFriend(client);                         break;
+            case 7:  tellServerWantToLookFriendList(client);   
+                     sem_wait(&show_friend_list);                   break;
+            case 8:  addFriendRequest(client);                      break;
+            case 9:  createGroup(client);                           break;
+            case 10: requestEnterGroup(client);                     break;
+            case 11: quitGroup(client);                             break;
+            case 12: masterDeleteGroup(client);                     break;
+            case 13: tellServerWantToLookAllGroupList(client); 
+                     sem_wait(&show_all_group_list);                break;
+            case 14: setGroupManager(client);                       break;
+            case 15: cancelGroupManager(client);                    break;
+            case 16: kickSomeoneInGroup(client);                    break;
+            case 17: GroupMemberList(client);                       break;
+            case 18: addSomeoneToGroup(client);                     break;
+            case 19: sendfile(client);                              break;
+            case 20: viewfile(client); sem_post(&show_file_list);   break;
+            case 21: receivefile(client);                           break;
+            case 22: ExitChatRoom();                                break;
             default:
                      std::cout << "\n";
                      std::cout << "command界面\n";
@@ -287,6 +381,7 @@ void addFriend(Client &client){
 
 void addFriendRequest(Client &client){
     tellServerWantToLookRequestList(client);
+    sem_wait(&show_request_list);
 
     std::string name;
     std::cout << "请输入要添加的好友名(exit退出):";
@@ -509,10 +604,14 @@ void handlePrivateChat(json &js){
 }
 
 void createGroup(Client& client){
-    std::cout << "请输入群名: " << std::endl;
+    std::cout << "请输入群名(exit退出): " << std::endl;
     std::string groupname;
     std::cin >> groupname;
     clearInputBuffer();
+
+    if(groupname == "exit") {
+        return;
+    }
 
     json response;
     response["msgid"] = CREATE_GROUP;
@@ -538,12 +637,17 @@ void displayAllGroupList(json &js){
 
 void requestEnterGroup(Client &client){
     tellServerWantToLookAllGroupList(client);
+    sem_wait(&show_all_group_list);
 
-    std::cout << "请输入要加入的群id: " << std::endl;
+    std::cout << "请输入要加入的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     json response;
     response["msgid"] = REQUEST_GROUP;
@@ -577,8 +681,8 @@ int displayGroupRequestList(json &js){
 }
 
 void addSomeoneToGroup(Client &client){
-
     tellServerWantToLookAllGroupList(client);
+    sem_wait(&show_all_group_list);
     std::cout << "请输入要查看的群id: " << std::endl;
 
 
@@ -610,12 +714,17 @@ void addSomeoneToGroup(Client &client){
 
 void quitGroup(Client &client){
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要退出的群id: " << std::endl;
+    std::cout << "请输入要退出的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     json response;
     response["msgid"] = QUIT_GROUP;
@@ -641,12 +750,17 @@ void displayOwnGroupList(json &js){
 
 void GroupMemberList(Client &client){
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要查看的群id: " << std::endl;
+    std::cout << "请输入要查看的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     tellServerWantToLookGroupMemberList(client, std::stoi(groupid));
 }
@@ -675,14 +789,18 @@ void tellServerWantToSetManagerGroupMemberList(Client &client, int groupid){
 }
 
 void setGroupManager(Client &client){
-
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要设置管理员的群id: " << std::endl;
+    std::cout << "请输入要设置管理员的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     tellServerWantToSetManagerGroupMemberList(client, std::stoi(groupid));
 
@@ -693,11 +811,15 @@ void setGroupManager(Client &client){
         return;
     }
 
-    std::cout << "请输入要设置为管理员的用户id: " << std::endl;
+    std::cout << "请输入要设置为管理员的用户id(-1退出): " << std::endl;
 
     std::string userid;
     std::cin >> userid;
     clearInputBuffer();
+
+    if(userid == "-1"){
+        return;
+    }
 
     if(std::stoi(userid) == CurrentUser.getId()){
         std::cout << "不能设置自己为管理员" << std::endl;
@@ -714,12 +836,17 @@ void setGroupManager(Client &client){
 
 void cancelGroupManager(Client &client){
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要取消管理员的群id: " << std::endl;
+    std::cout << "请输入要取消管理员的群id(-1): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     tellServerWantToSetManagerGroupMemberList(client, std::stoi(groupid));
 
@@ -729,11 +856,15 @@ void cancelGroupManager(Client &client){
         return;
     }
 
-    std::cout << "请输入要取消管理员的用户id: " << std::endl;
+    std::cout << "请输入要取消管理员的用户id(-1退出): " << std::endl;
 
     std::string userid;
     std::cin >> userid;
     clearInputBuffer();
+
+    if(userid == "-1"){
+        return;
+    }
 
     json response;
     response["msgid"] = CANCEL_MANAGER;
@@ -744,22 +875,30 @@ void cancelGroupManager(Client &client){
 }
 
 void kickSomeoneInGroup(Client &client){
-
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要踢出的群id: " << std::endl;
+    std::cout << "请输入要踢出的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
 
+    if(groupid == "-1"){
+        return;
+    }
+
     tellServerWantToLookGroupMemberList(client, std::stoi(groupid));
 
-    std::cout << "请输入要踢出的用户id: " << std::endl;
+    std::cout << "请输入要踢出的用户id(-1退出): " << std::endl;
 
     std::string userid;
     std::cin >> userid;
     clearInputBuffer();
+
+    if(userid == "-1"){
+        return;
+    }
 
     if(std::stoi(userid) == CurrentUser.getId()){
         std::cout << "不能踢出自己" << std::endl;
@@ -783,6 +922,7 @@ static void checkIfGroupMember(Client &client, int groupid){
 
 void groupChat(Client& client){
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
     std::cout << "请输入群id(-1退出): " << std::endl;
     std::string groupid;
@@ -843,12 +983,17 @@ void handleGroupChat(json &js){
 
 void masterDeleteGroup(Client &client){
     tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
-    std::cout << "请输入要解散的群id: " << std::endl;
+    std::cout << "请输入要解散的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
+
+    if(groupid == "-1"){
+        return;
+    }
 
     json response;
     response["msgid"] = MASTER_DELETE_GROUP;
@@ -861,9 +1006,13 @@ void sendfile(Client &client) {
     tellServerWantToLookFriendList(client);
     sem_wait(&show_friend_list);
 
-    std::cout << "想发送给(id):" << std::endl;
+    std::cout << "想发送给(id: -1 退出):" << std::endl;
     std::string receiver_id;
     std::cin >> receiver_id;
+
+    if (receiver_id == "-1") {
+        return;
+    }
 
     std::cout << "请输入文件路径: " << std::endl;
     std::string filePath;
@@ -928,10 +1077,15 @@ void displayFileList(json &js) {
 
 void receivefile(Client &client){
     viewfile(client);
+    sem_wait(&show_file_list);
 
-    std::cout << "接收文件(name):" << std::endl;
+    std::cout << "接收文件(name exit退出):" << std::endl;
     std::string filename;
     std::cin >> filename;
+
+    if(filename == "exit"){
+        return;
+    }
 
     json response;
     response["msgid"] = RECEIVE_FILE;
@@ -974,5 +1128,9 @@ void ExitChatRoom(){
     sem_destroy(&show_friend_list);
     sem_destroy(&check_if_block);
     sem_destroy(&show_block_list);
+    sem_destroy(&show_request_list);
+    sem_destroy(&show_own_group_list);
+    sem_destroy(&show_all_group_list);
+    sem_destroy(&show_file_list);
     exit(EXIT_SUCCESS);
 }
