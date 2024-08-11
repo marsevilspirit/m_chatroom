@@ -11,7 +11,6 @@ public:
     MySQL();
     ~MySQL();
 
-    bool connect();
 
     bool update(const std::string &sql);
 
@@ -19,7 +18,9 @@ public:
 
     MYSQL* getConnection();
 
+    bool connect();
 private:
+
     MYSQL *m_conn;
 
 };

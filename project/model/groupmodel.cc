@@ -1,6 +1,5 @@
 #include "groupmodel.h"
-#include "../database/database.h"
-#include <iostream>
+#include "../database/mysqlPool.h"
 
 // 创建群组
 bool GroupModel::createGroup(Group &group)
@@ -10,14 +9,12 @@ bool GroupModel::createGroup(Group &group)
     sprintf(sql, "insert into AllGroup(groupname) values('%s')",
             group.getName().c_str());
 
-    MySQL mysql;
-    if (mysql.connect())
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql->update(sql))
     {
-        if (mysql.update(sql))
-        {
-            group.setId(mysql_insert_id(mysql.getConnection()));
-            return true;
-        }
+        group.setId(mysql_insert_id(mysql->getConnection()));
+        MysqlPool::getInstance().releaseConnection(mysql);
+        return true;
     }
 
     return false;
@@ -26,43 +23,59 @@ bool GroupModel::createGroup(Group &group)
 // 加入群组
 bool GroupModel::addGroup(int userid, int groupid, std::string role)
 {
-    // 1.组装sql语句
+    // 1. 组装 SQL 语句
     char sql[1024] = {0};
     sprintf(sql, "insert into GroupUser values(%d, %d, '%s')",
             groupid, userid, role.c_str());
 
-    bool success{false};    
+    // 2. 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    bool success = false;
 
-    MySQL mysql;
-    if (mysql.connect())
+    if (mysql) 
     {
-        success = mysql.update(sql);
+        // 3. 执行 SQL 语句
+        success = mysql->update(sql);
+        
+        // 4. 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return success;
 }
 
-void GroupModel::modifyGroupRole(int userid, int groupid, std::string role){
+void GroupModel::modifyGroupRole(int userid, int groupid, std::string role)
+{
+    // 1. 组装 SQL 语句
     char sql[1024] = {0};
-    sprintf(sql, "update GroupUser set grouprole = '%s' where userid = %d and groupid = %d", role.c_str(), userid, groupid);
+    sprintf(sql, "update GroupUser set grouprole = '%s' where userid = %d and groupid = %d", 
+            role.c_str(), userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 2. 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+
+    if (mysql)
     {
-        mysql.update(sql);
+        // 3. 执行 SQL 语句
+        mysql->update(sql);
+        
+        // 4. 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 }
 
-std::vector<Group> GroupModel::queryAllGroup(){
+std::vector<Group> GroupModel::queryAllGroup()
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from AllGroup");
 
     std::vector<Group> groupVec;
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -74,23 +87,27 @@ std::vector<Group> GroupModel::queryAllGroup(){
                 groupVec.push_back(group);
             }
             mysql_free_result(res);
-            return groupVec;
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return groupVec;
 }
 
-std::vector<Group> GroupModel::queryOwnGroup(int userid){
+std::vector<Group> GroupModel::queryOwnGroup(int userid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select a.id, a.groupname from AllGroup a inner join GroupUser b on a.id = b.groupid where b.userid = %d", userid);
 
     std::vector<Group> groupVec;
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -102,24 +119,28 @@ std::vector<Group> GroupModel::queryOwnGroup(int userid){
                 groupVec.push_back(group);
             }
             mysql_free_result(res);
-            return groupVec;
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return groupVec;
 }
 
 
-std::vector<User> GroupModel::queryGroupRequest(int groupid){
+std::vector<User> GroupModel::queryGroupRequest(int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select a.id, a.name, b.grouprole from user a inner join GroupUser b on a.id = b.userid where b.groupid = %d and b.grouprole = 'request'", groupid);
 
     std::vector<User> userVec;
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -132,23 +153,27 @@ std::vector<User> GroupModel::queryGroupRequest(int groupid){
                 userVec.push_back(user);
             }
             mysql_free_result(res);
-            return userVec;
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return userVec;
 }
 
-std::vector<User> GroupModel::queryGroupMember(int groupid){
+std::vector<User> GroupModel::queryGroupMember(int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select a.id, a.name, b.grouprole from user a inner join GroupUser b on a.id = b.userid where b.groupid = %d and b.grouprole != 'request'", groupid);
 
     std::vector<User> userVec;
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -161,43 +186,56 @@ std::vector<User> GroupModel::queryGroupMember(int groupid){
                 userVec.push_back(user);
             }
             mysql_free_result(res);
-            return userVec;
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return userVec;
 }
 
-bool GroupModel::ifMaster(int userid, int groupid){
+bool GroupModel::ifMaster(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from GroupUser where userid = %d and groupid = %d and grouprole = 'master'", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
             if ((row = mysql_fetch_row(res)) != nullptr)
             {
                 mysql_free_result(res);
+                
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+                
                 return true;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return false;
 }
 
-std::string GroupModel::queryGroupRole(int userid, int groupid){
+std::string GroupModel::queryGroupRole(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select grouprole from GroupUser where userid = %d and groupid = %d", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -205,22 +243,32 @@ std::string GroupModel::queryGroupRole(int userid, int groupid){
             {
                 std::string role = row[0];
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return role;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return "";
 }
 
-std::string GroupModel::queryGroupName(int groupid){
+
+std::string GroupModel::queryGroupName(int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select groupname from AllGroup where id = %d", groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
@@ -228,131 +276,187 @@ std::string GroupModel::queryGroupName(int groupid){
             {
                 std::string groupname = row[0];
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return groupname;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return "";
 }
 
-
-bool GroupModel::ifManager(int userid, int groupid){
+bool GroupModel::ifManager(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from GroupUser where userid = %d and groupid = %d and grouprole = 'manager'", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
             if ((row = mysql_fetch_row(res)) != nullptr)
             {
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return true;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return false;
 }
 
 
-bool GroupModel::ifMasterOrManager(int userid, int groupid){
+bool GroupModel::ifMasterOrManager(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from GroupUser where userid = %d and groupid = %d and (grouprole = 'master' or grouprole = 'manager')", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
             if ((row = mysql_fetch_row(res)) != nullptr)
             {
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return true;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return false;
 }
 
-bool GroupModel::ifManagerOrNormal(int userid, int groupid){
+bool GroupModel::ifManagerOrNormal(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from GroupUser where userid = %d and groupid = %d and (grouprole = 'manager' or grouprole = 'normal')", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
             if ((row = mysql_fetch_row(res)) != nullptr)
             {
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return true;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return false;
 }
 
-bool GroupModel::ifMasterOrManagerORnormal(int userid, int groupid){
+bool GroupModel::ifMasterOrManagerORnormal(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "select * from GroupUser where userid = %d and groupid = %d and (grouprole = 'master' or grouprole = 'manager' or grouprole = 'normal')", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        MYSQL_RES *res = mysql.query(sql);
+        MYSQL_RES *res = mysql->query(sql);
         if (res != nullptr)
         {
             MYSQL_ROW row;
             if ((row = mysql_fetch_row(res)) != nullptr)
             {
                 mysql_free_result(res);
+
+                // 释放连接回到连接池
+                MysqlPool::getInstance().releaseConnection(mysql);
+
                 return true;
             }
         }
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     return false;
 }
 
-void GroupModel::deleteGroupMember(int userid, int groupid){
+void GroupModel::deleteGroupMember(int userid, int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "delete from GroupUser where userid = %d and groupid = %d", userid, groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        mysql.update(sql);
+        mysql->update(sql);
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 }
 
-void GroupModel::deleteGroup(int groupid){
+void GroupModel::deleteGroup(int groupid)
+{
     char sql[1024] = {0};
     sprintf(sql, "delete from AllGroup where id = %d", groupid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (mysql)
     {
-        mysql.update(sql);
+        mysql->update(sql);
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     char sql2[1024] = {0};
     sprintf(sql2, "delete from GroupUser where groupid = %d", groupid);
 
-    MySQL mysql2;
-    if (mysql2.connect())
+    // 从连接池获取一个数据库连接
+    auto mysql2 = MysqlPool::getInstance().getConnection();
+    if (mysql2)
     {
-        mysql2.update(sql2);
+        mysql2->update(sql2);
+
+        // 释放连接回到连接池
+        MysqlPool::getInstance().releaseConnection(mysql2);
     }
 }

@@ -34,8 +34,7 @@ bool MySQL::connect()
     }
     else
     {
-        LogInfo("connect mysql fail!");
-        LogInfo("connect mysql fail! Error: {}", mysql_error(m_conn));
+        LogWarn("connect mysql fail! Error: {}", mysql_error(m_conn));
     }
 
     return p;
@@ -46,7 +45,7 @@ bool MySQL::update(const std::string &sql)
 {
     if (mysql_query(m_conn, sql.c_str()))
     {
-        LogInfo("{} 更新失败", sql);
+        LogWarn("{} 更新失败", sql);
         return false;
     }
 
@@ -58,7 +57,7 @@ MYSQL_RES *MySQL::query(const std::string& sql)
 {
     if (mysql_query(m_conn, sql.c_str()))
     {
-        LogInfo("{} 查询失败", sql);
+        LogWarn("{} 查询失败", sql);
         return nullptr;
     }
     

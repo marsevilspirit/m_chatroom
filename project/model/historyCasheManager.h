@@ -1,4 +1,9 @@
-#include "../database/database.h"
+//Created by mars on 12/8/24
+
+#ifndef HISTORYCACHEMANAGER_H
+#define HISTORYCACHEMANAGER_H
+
+#include "../database/mysqlPool.h"
 #include "../database/redis.h"
 #include "../m_netlib/Log/mars_logger.h"
 #include <vector>
@@ -12,10 +17,6 @@ public:
     CacheManager() {
         if (!redis.connect()) {
             LogInfo("Failed to connect to Redis");
-            exit(1);
-        }
-        if (!mysql.connect()) {
-            LogInfo("Failed to connect to MySQL");
             exit(1);
         }
     }
@@ -55,16 +56,13 @@ public:
     }
 
     void flushCacheToDatabase() {
-
-        std::cout << "Flushing cache to database..." << std::endl;
-
+        LogInfo("Flushing cache to database...");
         flushPrivateChatCache();
         flushGroupChatCache();
     }
 
 private:
     Redis redis;
-    MySQL mysql;
 
     std::string getCurrentTimestamp() {
         time_t now = time(0);
@@ -77,6 +75,12 @@ private:
         std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
 
         if (cachedMessages.empty()) {
+            return;
+        }
+
+        auto mysql = MysqlPool::getInstance().getConnection();
+        if (!mysql) {
+            LogInfo("Failed to get MySQL connection from pool");
             return;
         }
 
@@ -94,18 +98,26 @@ private:
             sprintf(sql, "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
                 sender_id.c_str(), receiver_id.c_str(), message.c_str(), timestamp.c_str());
 
-            if (!mysql.update(sql)) {
+            if (!mysql->update(sql)) {
                 LogInfo("Failed to insert private message into MySQL");
             }
         }
         // 清空 Redis 缓存
         redis.ltrim("private_chat_cache", 1, 0);
+
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 
     void flushGroupChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("group_chat_cache", 0, -1);
 
         if (cachedMessages.empty()) {
+            return;
+        }
+
+        auto mysql = MysqlPool::getInstance().getConnection();
+        if (!mysql) {
+            LogInfo("Failed to get MySQL connection from pool");
             return;
         }
 
@@ -122,11 +134,16 @@ private:
             char sql[1024];
             sprintf(sql, "INSERT INTO group_chat_history(group_id, sender_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
                 group_id.c_str(), sender_id.c_str(), message.c_str(), timestamp.c_str());
-            if (!mysql.update(sql)) {
+
+            if (!mysql->update(sql)) {
                 LogInfo("Failed to insert group message into MySQL");
             }
         }
         // 清空 Redis 缓存
         redis.ltrim("group_chat_cache", 1, 0);
+
+        MysqlPool::getInstance().releaseConnection(mysql);
     }
 };
+
+#endif //HISTORYCACHEMANAGER_H

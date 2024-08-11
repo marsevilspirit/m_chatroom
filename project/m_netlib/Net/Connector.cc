@@ -14,12 +14,12 @@ Connector::Connector(EventLoop* loop, const InetAddress& serverAddr)
       m_state(kDisconnected),
       m_retryDelayMs(kInitRetryDelayMs)
 {
-    LogDebug("Connector::Connector[addr={}]", m_serverAddr.toHostPort());
+    LogTrace("Connector::Connector[addr={}]", m_serverAddr.toHostPort());
 }
 
 Connector::~Connector()
 {
-    LogDebug("Connector::~Connector[addr={}]", m_serverAddr.toHostPort());
+    LogTrace("Connector::~Connector[addr={}]", m_serverAddr.toHostPort());
 }
 
 void Connector::start(){
@@ -33,7 +33,7 @@ void Connector::startInLoop(){
     if(m_connect){
         connect();
     } else {
-        LogDebug("do not connect");
+        LogWarn("do not connect");
     }
 }
 

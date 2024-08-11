@@ -34,12 +34,12 @@ void Server::onConnection(const TcpConnectionPtr &conn)
 {
     if (conn->connected())
     {
-        std::cout << "onConnection(): new connection [" << conn->name() << "] from " << conn->peerAddress().toHostPort() << std::endl;
-        //Service::getInstance()->needEnter(conn, Timestamp::now());
+        LogInfo("onConnection(): new connection [{}] from {}", conn->name(), conn->peerAddress().toHostPort())
     }
     else
     {
         std::cout << "onConnection(): connection [" << conn->name() << "] is down" << std::endl;
+        LogInfo("onConnection(): connection [{}] is down", conn->name())
         Service::getInstance()->clientClose(conn);
         conn->shutdown();
     }
@@ -49,7 +49,7 @@ void Server::onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time
 {
     std::string str = buf->retrieveAsString(); // 这里可能会出现问题 原来是 buf->retrieveAllAsString()
 
-    LogDebug("Message: {}", str);
+    LogTrace("Message: {}", str)
 
     json js = json::parse(str);
 
@@ -65,7 +65,7 @@ void Server::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp tim
 {
     Service::getInstance()->setConnStatus(conn, true);
 
-    std::cout << "msg:" << js.dump() << std::endl;
+    LogTrace("Message: {}", js.dump())
 
     // 通过消息id获取对应的处理器
     int msgid = js["msgid"].get<int>();

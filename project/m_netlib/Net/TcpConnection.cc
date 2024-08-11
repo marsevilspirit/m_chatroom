@@ -17,14 +17,14 @@ TcpConnection::TcpConnection(EventLoop* loop, const std::string& name, int sockf
       m_localAddr(localAddr),
       m_peerAddr(peerAddr)
 {
-    LogInfo("TcpConnection::ctor[{}] at {} fd = {}", m_name, m_localAddr.toHostPort(), sockfd);
+    LogTrace("TcpConnection::ctor[{}] at {} fd = {}", m_name, m_localAddr.toHostPort(), sockfd);
     m_channel->setReadCallback(std::bind(&TcpConnection::handleRead, this, std::placeholders::_1));
     m_channel->setCloseCallback(std::bind(&TcpConnection::handleClose, this));
     m_channel->setErrorCallback(std::bind(&TcpConnection::handleError, this));
 }
 
 TcpConnection::~TcpConnection(){
-    LogInfo("TcpConnection::dtor[{}] at {} fd = {}", m_name, m_localAddr.toHostPort(), m_channel->fd());
+    LogTrace("TcpConnection::dtor[{}] at {} fd = {}", m_name, m_localAddr.toHostPort(), m_channel->fd());
 }
 
 void TcpConnection::connectDestroyed(){

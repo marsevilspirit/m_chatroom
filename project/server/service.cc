@@ -116,7 +116,7 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
     std::string pwd = js["password"];
 
     User user = m_userModel.query(name);
-    std::cout << "user id:" << user.getId() << " name:" << user.getName() << " pwd:" << user.getPwd() << " state:" << user.getState() << '\n';
+    LogTrace("user id:{} name:{} pwd:{} state:{}", user.getId(), user.getName(), user.getPwd(), user.getState())
     if (user.getName() == name && user.getPwd() == pwd){
         if (user.getState() == "online"){
             json response;
@@ -173,12 +173,12 @@ void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp 
     int from_id = m_connUserMap[conn];
     int to_id = add_user.getId();
 
-    std::cout << "from_id:" << from_id << " to_id:" << to_id << '\n';
+    LogTrace("from_id:{} to_id:{}", from_id, to_id)
 
     std::string state1 = m_friendModel.getState(from_id, to_id);
     std::string state2 = m_friendModel.getState(to_id, from_id);
 
-    std::cout << "state1:" << state1 << " state2:" << state2 << '\n';
+    LogTrace("state1:{} state2:{}", state1, state2)
 
     if ((state1 == "" && state2 == "") || (state1 == "request" && state2 == "")) // 发起好友请求
     {
@@ -271,7 +271,7 @@ void Service::handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp
     int check_id = js["check_id"];
     int user_id = m_connUserMap[conn]; 
 
-    std::cout << "check_id:" << check_id << " user_id:" << user_id << '\n';
+    LogTrace("check_id:{} user_id:{}", check_id, user_id)
 
     std::string state1 = m_friendModel.getState(user_id, check_id);
     std::string state2 = m_friendModel.getState(check_id, user_id);
@@ -287,7 +287,7 @@ void Service::handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp
     {
         it->second->send(response.dump().append("\r\n"));
     } else {
-        std::cout << "m_userConnMap is null" << std::endl;
+        LogInfo("m_userConnMap is null")
     }
 }
 
@@ -367,10 +367,6 @@ void Service::handleFriendRequestList(const TcpConnectionPtr &conn, json &js, Ti
         vec.push_back(js.dump());
     }
 
-    for(std::string &str : vec){
-        std::cout << str << std::endl;
-    }
-
     json response;
     response["msgid"] = FRIEND_REQUEST_LIST;
     response["requests"] = vec;
@@ -441,7 +437,6 @@ void Service::handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Tim
         return;
     }
 
-    std::cout << "444" << std::endl;
     std::vector<User> userVec = m_groupModel.queryGroupRequest(groupid);
 
     std::vector<std::string> vec;
@@ -860,7 +855,7 @@ void Service::checkIfConnAlive(){
         if (it->second == false)
         {
             int id = m_connUserMap[it->first];
-            std::cout << "心跳检测到用户 " << id << " 掉线\n";
+            LogInfo("心跳检测到用户 {} 掉线", id)
 
             json response;
             response["msgid"] = CLIENT_LONGTIME_EXIT;
@@ -888,7 +883,7 @@ void Service::checkIfConnAlive(){
 
 // 处理客户端异常退出
 void Service::clientClose(const TcpConnectionPtr &conn){
-    std::cout << "client close" << std::endl;
+    LogInfo("client {} close", m_connUserMap[conn]);
 
     User user;
     {
@@ -906,8 +901,6 @@ void Service::clientClose(const TcpConnectionPtr &conn){
             }
         }
     }
-
-    LogInfo("User {} closed", user.getName());
 
     // 更新用户的状态信息
     if (user.getId() != -1)   //没找到这个 ，id就是默认的构造函数设置的-1，不等于-1说明是有效的用户

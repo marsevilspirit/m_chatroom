@@ -45,7 +45,7 @@ void Channel::handleEvent(base::Timestamp receiveTime){
     }
 
     if(m_revents & (POLLIN | POLLPRI | POLLRDHUP)){
-        LogInfo("Channel::handleEvent() POLLIN | POLLPRI | POLLRDHUP");// 有数据可读
+        LogTrace("Channel::handleEvent() POLLIN | POLLPRI | POLLRDHUP");// 有数据可读
         if(m_readCallback) m_readCallback(receiveTime);
     }
 

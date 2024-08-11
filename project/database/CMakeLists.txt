@@ -3,6 +3,8 @@ add_library(database
     database.h
     redis.h
     redis.cc
+    mysqlPool.h
+    mysqlPool.cc
 )
 
 target_link_libraries(database -lmysqlclient -lhiredis)

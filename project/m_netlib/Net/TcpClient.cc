@@ -49,7 +49,7 @@ TcpClient::~TcpClient()
 
 void TcpClient::connect()
 {
-    LogInfo("TcpClient::connect[{}] - connecting to {}", m_name, m_connector->serverAddress().toHostPort());
+    LogTrace("TcpClient::connect[{}] - connecting to {}", m_name, m_connector->serverAddress().toHostPort());
     m_connect = true;
     m_connector->start();
 }
@@ -82,7 +82,7 @@ void TcpClient::newConnection(int sockfd)
     ++m_nextConnId;
     std::string connName = m_name + buf;
 
-    LogInfo("TcpClient::newConnection[{}] - new connection [{}] from {}", m_name, connName, peerAddr.toHostPort());
+    LogTrace("TcpClient::newConnection[{}] - new connection [{}] from {}", m_name, connName, peerAddr.toHostPort());
 
     InetAddress localAddr(sockets::getLocalAddr(sockfd));
     TcpConnectionPtr conn(new TcpConnection(m_loop, connName, sockfd, localAddr, peerAddr));
