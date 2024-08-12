@@ -65,16 +65,12 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 login_flag = false; 
                                                 sem_post(&login_sem);                                                              
                                                 break;
-        case FRIEND_ONLINE:                     std::cout << "id:" << js["id"] << " name:" << js["name"] << " 上线" << std::endl; 
-                                                break;
         case DISPLAY_ALLUSER_LIST:              displayAllUserList(js); 
                                                 sem_post(&show_all_user_list);                                                   
                                                 break;
         case ADD_FRIEND_SUCCESS:                std::cout << "添加成功" << std::endl;                                              
                                                 break;
         case ADD_FRIEND_REQUEST:                std::cout << "你向对方发起好友申请" << std::endl;                                  
-                                                break;
-        case THE_OTHER_AGREE_FRIEND_REQUEST:    std::cout << js["friend_name"] << "同意了你的好友申请" << std::endl;                               
                                                 break;
         case UPDATE_FRIEND_LIST:                std::cout << "更新好友列表" << std::endl;                                          
                                                 break;
@@ -109,6 +105,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 break;
         case CHECK_BLOCK:                       if_block = (js["state1"] == "block") || (js["state2"] == "block"); 
                                                 if_friend = (js["state1"] == "friend") || (js["state2"] == "friend") || if_block; 
+                                                std::cout << "state1:" << js["state1"] << " state2:" << js["state2"] << std::endl;
+                                                std::cout << "if_friend:" << if_friend << " if_block:" << if_block << std::endl;
                                                 sem_post(&check_if_block);                                                         
                                                 break;
         case CREATE_GROUP_SUCCESS:              std::cout << "创建群聊成功" << std::endl;                                        
@@ -178,6 +176,9 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 break;
         case RECEIVE_FILE_FINISH:               std::cout << "文件接收完成" << std::endl; 
                                                 sem_post(&receive_file); 
+                                                break;
+        case RECEIVE_FILE_FAIL:                 std::cout << "文件接收失败" << std::endl; 
+                                                sem_post(&receive_file);
                                                 break;
         case DISPLAY_PRIVATE_HISTORY:           displayPrivateChatHistory(js); 
                                                 break;
@@ -361,8 +362,7 @@ void EnterCommandMenu(Client &client){
             case 17: GroupMemberList(client);                       break;
             case 18: addSomeoneToGroup(client);                     break;
             case 19: sendfile(client);                              break;
-            case 20: viewfile(client); 
-                     sem_post(&show_file_list);                     break;
+            case 20: viewfile(client); sem_wait(&show_file_list);   break;
             case 21: receivefile(client);                           break;
             case 22: ExitChatRoom();                                break;
             default:
@@ -462,6 +462,11 @@ void deleteFriend(Client &client){
     std::cin >> id;
     clearInputBuffer();
 
+    if(id == CurrentUser.getId()){
+        std::cout << "不能删除自己" << std::endl;
+        return;
+    }
+
     if(id == -1){
         return;
     }
@@ -481,6 +486,11 @@ void blockFriend(Client& client){
     std::cout << "请输入要屏蔽的好友id(-1退出):";
     std::cin >> id;
     clearInputBuffer();
+
+    if(id == CurrentUser.getId()) {
+        std::cout << "不能屏蔽自己" << std::endl;
+        return;
+    }
 
     if(id == -1){
         return;
@@ -607,6 +617,7 @@ void privateChat(Client &client) {
     if_friend = false;
     checkIfBlock(client, id_to_chat);
     sem_wait(&check_if_block);
+    usleep(1000);
 
     if(!if_friend) {
         std::cout << "你与对方不是好友" << std::endl;
@@ -693,12 +704,12 @@ void requestEnterGroup(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)){
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -736,23 +747,23 @@ int displayGroupRequestList(json &js){
 void addSomeoneToGroup(Client &client){
     tellServerWantToLookAllGroupList(client);
     sem_wait(&show_all_group_list);
+
     std::cout << "请输入要查看的群id(-1退出): " << std::endl;
 
     std::string groupid;
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
-        return;
-    }
-
     if(!isNumber(groupid)){
         std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    tellServerWantToLookGroupRequestList(client, std::stoi(groupid));
+    if(groupid == "-1"){
+        return;
+    }
 
+    tellServerWantToLookGroupRequestList(client, std::stoi(groupid));
     sem_wait(&add_someone_to_group);
 
     if(!if_master_ormanager){
@@ -765,12 +776,12 @@ void addSomeoneToGroup(Client &client){
     std::cin >> userid;
     clearInputBuffer();
 
-    if(userid == "-1"){
+    if(!isNumber(userid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(userid)) {
-        std::cout << "请输入数字" << std::endl;
+    if(userid == "-1"){
         return;
     }
 
@@ -792,12 +803,12 @@ void quitGroup(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)) {
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -833,12 +844,12 @@ void GroupMemberList(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)){
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -878,17 +889,16 @@ void setGroupManager(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
-        return;
-    }
-
-    if(!isNumber(groupid)){
+    if(!isNumber(groupid)) {
         std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    tellServerWantToSetManagerGroupMemberList(client, std::stoi(groupid));
+    if(groupid == "-1"){
+        return;
+    }
 
+    tellServerWantToSetManagerGroupMemberList(client, std::stoi(groupid));
     sem_wait(&set_manager);
 
 
@@ -902,12 +912,12 @@ void setGroupManager(Client &client){
     std::cin >> userid;
     clearInputBuffer();
 
-    if(userid == "-1"){
+    if(!isNumber(userid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(userid)){
-        std::cout << "请输入数字" << std::endl;
+    if(userid == "-1"){
         return;
     }
 
@@ -934,12 +944,12 @@ void cancelGroupManager(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)){
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -957,12 +967,12 @@ void cancelGroupManager(Client &client){
     std::cin >> userid;
     clearInputBuffer();
 
-    if(userid == "-1"){
+    if(!isNumber(userid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(userid)){
-        std::cout << "请输入数字" << std::endl;
+    if(userid == "-1"){
         return;
     }
 
@@ -984,12 +994,12 @@ void kickSomeoneInGroup(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)){
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -1001,12 +1011,12 @@ void kickSomeoneInGroup(Client &client){
     std::cin >> userid;
     clearInputBuffer();
 
-    if(userid == "-1"){
+    if(!isNumber(userid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(userid)){
-        std::cout << "请输入数字" << std::endl;
+    if(userid == "-1"){
         return;
     }
 
@@ -1039,18 +1049,18 @@ void groupChat(Client& client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
-        return;
-    }
-
-    if(!isNumber(groupid)){
+    if(!isNumber(groupid)) {
         std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    checkIfGroupMember(client, std::stoi(groupid));
+    if(groupid == "-1"){
+        return;
+    }
 
+    checkIfGroupMember(client, std::stoi(groupid));
     sem_wait(&check_group_member);
+
 
     if(!if_group_member){
         std::cout << "你不是群成员" << std::endl;
@@ -1106,12 +1116,12 @@ void masterDeleteGroup(Client &client){
     std::cin >> groupid;
     clearInputBuffer();
 
-    if(groupid == "-1"){
+    if(!isNumber(groupid)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if(!isNumber(groupid)){
-        std::cout << "请输入数字" << std::endl;
+    if(groupid == "-1"){
         return;
     }
 
@@ -1130,12 +1140,12 @@ void sendfile(Client &client) {
     std::string receiver_id;
     std::cin >> receiver_id;
 
-    if (receiver_id == "-1") {
+    if(!isNumber(receiver_id)) {
+        std::cout << "请输入数字" << std::endl;
         return;
     }
 
-    if (!isNumber(receiver_id)) {
-        std::cout << "请输入数字" << std::endl;
+    if (receiver_id == "-1") {
         return;
     }
 
@@ -1162,7 +1172,7 @@ void sendfile(Client &client) {
     client.send(metadata.dump().append("\r\n"));
 
     // 逐块发送文件数据
-    char buffer[40960];
+    char buffer[4096];
     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
         client.send(std::string(buffer, file.gcount()));
         usleep(10);

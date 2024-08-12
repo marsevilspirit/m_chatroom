@@ -356,6 +356,10 @@ void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestam
     std::string from_name = js["from_name"];
     int to_id = js["id"];
 
+    LogInfo("{} want to send private message to {}", m_connUserMap[conn], to_id)
+
+    std::cout << "msg: " << msg << " from_name: " << from_name << " to_id: " << to_id << std::endl;
+
     json response;
     response["msgid"] = PRIVATE_CHAT;
     response["msg"] = msg;
@@ -364,15 +368,14 @@ void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestam
 
     cacheManager->storePrivateMessageInCache(std::to_string(m_connUserMap[conn]), std::to_string(to_id), msg);
 
+    std::cout << "finish store private message in cache" << std::endl;
+
     auto it = m_userConnMap.find(to_id); 
     if (it != m_userConnMap.end())
     {
         TcpConnectionPtr to_conn = it->second;
         to_conn->send(response.dump().append("\r\n"));
-    } else {
-        // 对方不在线
-        // 存储离线消息
-    }
+    } 
 }
 
 void Service::handleDisplayFriendList(const TcpConnectionPtr &conn, json &js, Timestamp time){
@@ -805,6 +808,9 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << filePath << std::endl;
+        json response;
+        response["msgid"] = RECEIVE_FILE_FAIL;
+        conn->send(response.dump().append("\r\n"));
         return;
     }
 
@@ -822,7 +828,7 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     conn->send(metadata.dump().append("\r\n"));
 
     // 发送文件数据
-    char buffer[40960];
+    char buffer[4096];
     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
         conn->send(std::string(buffer, file.gcount()));
         usleep(10);

@@ -27,10 +27,12 @@ int main()
         cacheManager->flushCacheToDatabase();  // 刷新缓存到数据库
     });
 
+    /*
     loop.runEvery(60.0, []() {
         std::cout << "心跳检测检查" << std::endl;
         Service::getInstance()->checkIfConnAlive();
     });
+    */
 
     loop.loop();
 

@@ -52,8 +52,9 @@ public:
     }
 
     void flushCacheToDatabase() {
-        LogInfo("Flushing cache to database...");
+        LogTrace("Flushing cache to database...");
         flushPrivateChatCache();
+
         flushGroupChatCache();
     }
 
@@ -101,9 +102,8 @@ private:
 
             std::string escapedMessage = escapeSingleQuotes(message);
 
-            char sql[1024];
-            sprintf(sql, "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
-                sender_id.c_str(), receiver_id.c_str(), escapedMessage.c_str(), timestamp.c_str());
+            std::string sql = "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('"
+                      + sender_id + "', '" + receiver_id + "', '" + escapedMessage + "', '" + timestamp + "')";
 
             if (!mysql->update(sql)) {
                 LogWarn("Failed to insert private message into MySQL");
@@ -140,9 +140,8 @@ private:
 
             std::string escapedMessage = escapeSingleQuotes(message);
 
-            char sql[1024];
-            sprintf(sql, "INSERT INTO group_chat_history(group_id, sender_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
-                group_id.c_str(), sender_id.c_str(), escapedMessage.c_str(), timestamp.c_str());
+            std::string sql = "INSERT INTO group_chat_history(group_id, sender_id, message, timestamp) VALUES('"
+                      + group_id + "', '" + sender_id + "', '" + escapedMessage + "', '" + timestamp + "')";
 
             if (!mysql->update(sql)) {
                 LogWarn("Failed to insert group message into MySQL");
