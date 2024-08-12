@@ -12,7 +12,7 @@
 class MysqlPool {
 public:
     // 获取连接池的唯一实例
-    static MysqlPool& getInstance(size_t poolSize = 10) {
+    static MysqlPool& getInstance(size_t poolSize = 20) {
         static MysqlPool instance(poolSize);
         return instance;
     }

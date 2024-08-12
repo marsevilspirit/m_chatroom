@@ -55,6 +55,8 @@ Service::Service(){
 }
 
 void Service::groupUserListMapInit(){
+    LogInfo("groupUserList init")
+
     std::vector<Group> groupVec = m_groupModel.queryAllGroup();
     for (Group &group : groupVec)
     {
@@ -94,6 +96,8 @@ void Service::reg(const TcpConnectionPtr &conn, json &js, Timestamp time) {
     std::string name = js["name"];
     std::string pwd  = js["password"];
 
+    LogInfo("{} want to reg", name)
+
     User user;
     user.setName(name);
     user.setPwd(pwd);
@@ -114,6 +118,8 @@ void Service::reg(const TcpConnectionPtr &conn, json &js, Timestamp time) {
 void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
     std::string name = js["name"];
     std::string pwd = js["password"];
+
+    LogInfo("{} want to login", name)
 
     User user = m_userModel.query(name);
     LogTrace("user id:{} name:{} pwd:{} state:{}", user.getId(), user.getName(), user.getPwd(), user.getState())
@@ -138,6 +144,21 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
             response["name"] = user.getName();
 
             conn->send(response.dump().append("\r\n"));
+
+            // 向在线好友发送上线通知
+            std::vector<User> userVec = m_friendModel.query(user.getId());
+            for (User &userTmp : userVec)
+            {
+                auto it = m_userConnMap.find(userTmp.getId());
+                if (it != m_userConnMap.end())
+                {
+                    json response;
+                    response["msgid"] = FRIEND_ONLINE;
+                    response["id"] = user.getId();
+                    response["name"] = user.getName();
+                    it->second->send(response.dump().append("\r\n"));
+                }
+            }
         }
     } else { // 不存在
         json response;
@@ -148,6 +169,8 @@ void Service::login(const TcpConnectionPtr &conn, json &js, Timestamp time){
 }
 
 void Service::handleDisplayAllUserList(const TcpConnectionPtr &conn, json &js, Timestamp time){
+    LogInfo("{} want to display all user list", m_connUserMap[conn])
+
     std::vector<User> userVec = m_userModel.query();
     std::vector<std::string> vec;
     for (User &user : userVec)
@@ -167,6 +190,8 @@ void Service::handleDisplayAllUserList(const TcpConnectionPtr &conn, json &js, T
 
 void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp time){
     std::string add_name = js["add_name"];
+
+    LogInfo("{} want to add friend {}", m_connUserMap[conn], add_name)
 
     User add_user = m_userModel.query(add_name);
 
@@ -201,7 +226,15 @@ void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp 
         conn->send(from_response.dump().append("\r\n"));
         if (from_response["friend_state"] == "online")
         {
-            //todo
+            // 向对方通知同意添加好友
+            auto it = m_userConnMap.find(to_id);
+            if (it != m_userConnMap.end())
+            {
+                json to_response;
+                to_response["msgid"] = THE_OTHER_AGREE_FRIEND_REQUEST;
+                to_response["friend_name"] = m_userModel.query(from_id).getName();
+                it->second->send(to_response.dump().append("\r\n"));
+            }
         }
         return;
     }
@@ -209,6 +242,8 @@ void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp 
 
 void Service::handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int delete_id = js["del_id"];
+
+    LogInfo("{} want to delete friend {}", m_connUserMap[conn], delete_id)
 
     User delete_user = m_userModel.query(delete_id);
 
@@ -233,6 +268,8 @@ void Service::handleBlockFriend(const TcpConnectionPtr &conn, json &js, Timestam
     int block_id = js["block_id"];
     int user_id = m_connUserMap[conn]; 
 
+    LogInfo("{} want to block friend {}", user_id, block_id)
+
     std::string state1 = m_friendModel.getState(user_id, block_id);
 
     if (state1 == "friend")
@@ -252,6 +289,8 @@ void Service::handleUnBlockFriend(const TcpConnectionPtr &conn, json &js, Timest
     int unblock_id = js["unblock_id"];
     int user_id = m_connUserMap[conn]; 
 
+    LogInfo("{} want to unblock friend {}", user_id, unblock_id)
+
     std::string state1 = m_friendModel.getState(user_id, unblock_id);
 
     if (state1 == "block")
@@ -270,6 +309,8 @@ void Service::handleUnBlockFriend(const TcpConnectionPtr &conn, json &js, Timest
 void Service::handleCheckBlock(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int check_id = js["check_id"];
     int user_id = m_connUserMap[conn]; 
+
+    LogInfo("{} want to check block state of friend {}", user_id, check_id)
 
     LogTrace("check_id:{} user_id:{}", check_id, user_id)
 
@@ -377,6 +418,8 @@ void Service::handleCreateGroup(const TcpConnectionPtr &conn, json &js, Timestam
     std::string group_name = js["groupname"];
     int userid = m_connUserMap[conn];
 
+    LogInfo("{} want to create group {}", userid, group_name)
+
     Group group;
     group.setName(group_name);
 
@@ -414,6 +457,8 @@ void Service::handleDisplayAllGroupList(const TcpConnectionPtr &conn, json &js, 
 void Service::requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int groupid = js["add_group_id"];
     int userid = m_connUserMap[conn];
+
+    LogInfo("{} want to add group {}", userid, groupid)
 
     json response;
 
@@ -458,6 +503,8 @@ void Service::handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Ti
     int groupid = js["groupid"];
     int userid = js["userid"];
 
+    LogInfo("{} want to add {} to group {}", m_connUserMap[conn], userid, groupid)
+
     if(m_groupModel.ifMasterOrManager(m_connUserMap[conn], groupid) == false){
         json response;
         response["msgid"] = ADD_GROUP_FAIL;
@@ -477,6 +524,8 @@ void Service::handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Ti
 void Service::handleQuitGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int groupid = js["groupid"];
     int userid = m_connUserMap[conn];
+
+    LogInfo("{} want to quit group {}", userid, groupid)
 
     if(m_groupModel.ifManagerOrNormal(m_connUserMap[conn], groupid) == false){
         json response;
@@ -512,7 +561,6 @@ void Service::handleShowOwnGroupList(const TcpConnectionPtr &conn, json &js, Tim
     response["groups"] = vec;
     conn->send(response.dump().append("\r\n"));
 }
-
 
 void Service::handleShowGroupMemberList(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int groupid = js["groupid"];
@@ -574,6 +622,8 @@ void Service::handleSetManager(const TcpConnectionPtr &conn, json &js, Timestamp
     int groupid = js["groupid"];
     int userid = js["userid"];
 
+    LogInfo("{} want to set {} as manager in group {}", m_connUserMap[conn], userid, groupid)
+
     std::string state = m_groupModel.queryGroupRole(userid, groupid);
 
     if(state != "normal")
@@ -595,6 +645,8 @@ void Service::handleCancelManager(const TcpConnectionPtr &conn, json &js, Timest
     int groupid = js["groupid"];
     int userid = js["userid"];
 
+    LogInfo("{} want to cancel {} as manager in group {}", m_connUserMap[conn], userid, groupid)
+
     if(m_groupModel.ifManager(userid, groupid) == false){
         json response;
         response["msgid"] = CANCEL_MANAGER_FAIL;
@@ -612,6 +664,8 @@ void Service::handleCancelManager(const TcpConnectionPtr &conn, json &js, Timest
 void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
     int groupid = js["groupid"];
     int userid = js["userid"];
+
+    LogInfo("{} want to kick {} in group {}", m_connUserMap[conn], userid, groupid)
 
     std::string kick_state = m_groupModel.queryGroupRole(m_connUserMap[conn], groupid); 
     std::string be_kick_state = m_groupModel.queryGroupRole(userid, groupid);
@@ -688,9 +742,7 @@ void Service::handleGroupChat(const TcpConnectionPtr &conn, json &js, Timestamp 
         if (it != m_userConnMap.end())
         {
             it->second->send(response.dump().append("\r\n"));
-        } else {
-            // 存储离线消息
-        }
+        } 
     }
 }
 

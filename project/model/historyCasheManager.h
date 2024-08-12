@@ -31,10 +31,8 @@ public:
 
         std::string chat_record_str = chat_record.dump(); // 将 JSON 对象序列化为字符串
 
-        std::cout << "private chat record: " << chat_record_str << "\n";
-
         if (!redis.rpush("private_chat_cache", chat_record_str)) {
-            LogInfo("Failed to store private message in Redis cache");
+            LogWarn("Failed to store private message in Redis cache");
         }
     }
 
@@ -48,10 +46,8 @@ public:
 
         std::string chat_record_str = chat_record.dump(); // 将 JSON 对象序列化为字符串
 
-        std::cout << "group chat record: " << chat_record_str << "\n";
-
         if (!redis.rpush("group_chat_cache", chat_record_str)) {
-            LogInfo("Failed to store group message in Redis cache");
+            LogWarn("Failed to store group message in Redis cache");
         }
     }
 
@@ -71,6 +67,15 @@ private:
         return std::string(buf);
     }
 
+    std::string escapeSingleQuotes(std::string input) {
+        size_t pos = 0;
+        while ((pos = input.find("'", pos)) != std::string::npos) {
+            input.replace(pos, 1, "''");
+            pos += 2;  // 移动到下一个位置，避免重复替换
+        }
+    return input;
+    }
+
     void flushPrivateChatCache() {
         std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
 
@@ -80,7 +85,7 @@ private:
 
         auto mysql = MysqlPool::getInstance().getConnection();
         if (!mysql) {
-            LogInfo("Failed to get MySQL connection from pool");
+            LogWarn("Failed to get MySQL connection from pool");
             return;
         }
 
@@ -94,12 +99,14 @@ private:
             std::string message = record["message"];
             std::string timestamp = record["timestamp"];
 
+            std::string escapedMessage = escapeSingleQuotes(message);
+
             char sql[1024];
             sprintf(sql, "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
-                sender_id.c_str(), receiver_id.c_str(), message.c_str(), timestamp.c_str());
+                sender_id.c_str(), receiver_id.c_str(), escapedMessage.c_str(), timestamp.c_str());
 
             if (!mysql->update(sql)) {
-                LogInfo("Failed to insert private message into MySQL");
+                LogWarn("Failed to insert private message into MySQL");
             }
         }
         // 清空 Redis 缓存
@@ -117,7 +124,7 @@ private:
 
         auto mysql = MysqlPool::getInstance().getConnection();
         if (!mysql) {
-            LogInfo("Failed to get MySQL connection from pool");
+            LogWarn("Failed to get MySQL connection from pool");
             return;
         }
 
@@ -131,12 +138,14 @@ private:
             std::string message = record["message"];
             std::string timestamp = record["timestamp"];
 
+            std::string escapedMessage = escapeSingleQuotes(message);
+
             char sql[1024];
             sprintf(sql, "INSERT INTO group_chat_history(group_id, sender_id, message, timestamp) VALUES('%s', '%s', '%s', '%s')",
-                group_id.c_str(), sender_id.c_str(), message.c_str(), timestamp.c_str());
+                group_id.c_str(), sender_id.c_str(), escapedMessage.c_str(), timestamp.c_str());
 
             if (!mysql->update(sql)) {
-                LogInfo("Failed to insert group message into MySQL");
+                LogWarn("Failed to insert group message into MySQL");
             }
         }
         // 清空 Redis 缓存

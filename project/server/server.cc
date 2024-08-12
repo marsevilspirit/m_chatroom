@@ -20,7 +20,7 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr)
     m_server.setConnectionCallback(std::bind(&Server::onConnection, this, std::placeholders::_1));
     m_server.setMessageCallback(std::bind(&JsonCodec::onMessage, &m_codec, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-    m_server.setThreadNum(4);
+    m_server.setThreadNum(32);
 
     Service::getInstance()->groupUserListMapInit();
 }
