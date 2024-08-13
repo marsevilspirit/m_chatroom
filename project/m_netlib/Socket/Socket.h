@@ -20,6 +20,8 @@ public:
 
     void setTcpNoDelay(bool on);
 
+    void setTcpKeepAlive(bool on);
+
     void shutdownWrite() const;
 
 private:

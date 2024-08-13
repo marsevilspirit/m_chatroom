@@ -64,6 +64,8 @@ public:
 
     void requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
+    void response_to_master_or_manager(int groupid, int userid);
+
     void handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time);
 
     void handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);

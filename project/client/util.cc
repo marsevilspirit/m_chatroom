@@ -2,6 +2,7 @@
 #include <limits>
 #include <termios.h>
 #include <unistd.h>
+#include <algorithm>
 
 // 将字节数组转换为十六进制字符串
 std::string bytesToHex(const unsigned char* bytes, size_t length)
@@ -86,3 +87,6 @@ std::string getPassword() {
     return password;
 }
 
+bool isNumber(const std::string& s) {
+    return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);
+}

@@ -17,4 +17,6 @@ void clearInputBuffer();
 
 std::string getPassword();
 
+bool isNumber(const std::string& s);
+
 #endif //MARS_UTIL_H

@@ -99,7 +99,7 @@ std::vector<Group> GroupModel::queryAllGroup()
 std::vector<Group> GroupModel::queryOwnGroup(int userid)
 {
     char sql[1024] = {0};
-    sprintf(sql, "select a.id, a.groupname from AllGroup a inner join GroupUser b on a.id = b.groupid where b.userid = %d", userid);
+    sprintf(sql, "select a.id, a.groupname, b.grouprole from AllGroup a inner join GroupUser b on a.id = b.groupid where b.userid = %d", userid);
 
     std::vector<Group> groupVec;
 
@@ -116,6 +116,7 @@ std::vector<Group> GroupModel::queryOwnGroup(int userid)
                 Group group;
                 group.setId(atoi(row[0]));
                 group.setName(row[1]);
+                group.setGroupRole(row[2]);
                 groupVec.push_back(group);
             }
             mysql_free_result(res);

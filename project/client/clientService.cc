@@ -12,7 +12,6 @@
 #include <sys/sendfile.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 
 sem_t reg_sem;
 sem_t login_sem;
@@ -115,6 +114,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case DISPLAY_ALLGROUP_LIST:             displayAllGroupList(js); 
                                                 sem_post(&show_all_group_list);                                                 
                                                 break;
+        case GROUP_REQUEST:                     std::cout << js["userid"] << "申请加入群聊"<< js["groupid"] << std::endl; 
+                                                break;
         case REQUEST_GROUP_SUCCESS:             std::cout << "提交加入群聊申请成功" << std::endl;                               
                                                 break;
         case REQUEST_GROUP_FAIL:                std::cout << "提交加入群聊申请失败" << std::endl;                                  
@@ -127,6 +128,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 sem_post(&add_someone_to_group);                                           
                                                 break;
         case ADD_GROUP_SUCCESS:                 std::cout << "添加群成员成功" << std::endl;                                         
+                                                break;
+        case GROUP_REQUEST_ACCEPTED:            std::cout << js["accept_id"] << "同意了你进入群" << js["groupid"] << "的请求" << std::endl; 
                                                 break;
         case ADD_GROUP_FAIL:                    std::cout << "添加群成员失败" << std::endl;                                            
                                                 break;
@@ -236,11 +239,6 @@ void EnterChatRoom(Client &client){
         }
     }   
 
-}
-
-
-bool isNumber(const std::string& s) {
-    return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);
 }
 
 void reg(Client &client){
@@ -722,8 +720,8 @@ int displayGroupRequestList(json &js){
 }
 
 void addSomeoneToGroup(Client &client){
-    tellServerWantToLookAllGroupList(client);
-    sem_wait(&show_all_group_list);
+    tellServerShowOwnGroupList(client);
+    sem_wait(&show_own_group_list);
 
     std::cout << "请输入要查看的群id(-1退出): " << std::endl;
 
@@ -1367,5 +1365,5 @@ void ExitChatRoom(){
     sem_destroy(&show_own_group_list);
     sem_destroy(&show_all_group_list);
     sem_destroy(&show_file_list);
-    exit(EXIT_SUCCESS);
+    ::_exit(EXIT_SUCCESS);
 }

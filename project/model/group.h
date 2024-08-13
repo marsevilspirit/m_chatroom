@@ -19,14 +19,17 @@ public:
 
     void setId(int id) { m_id = id; }
     void setName(std::string name) { m_name = name; }
+    void setGroupRole(std::string role) { m_grouprole = role; }
 
     int getId() { return m_id; }
     std::string getName() { return m_name; }
     std::vector<GroupUser> &getUsers() { return m_users; }
+    std::string getGroupRole() { return m_grouprole; }
 
 private:
     int m_id;
     std::string m_name;
+    std::string m_grouprole;
     std::vector<GroupUser> m_users;    //把群组的成员都放入vector当中，users给业务层去使用
 };
 

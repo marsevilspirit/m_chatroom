@@ -41,12 +41,13 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
 
                 try {
                     json js = json::parse(jsonString);
+
                     int msgid = js["msgid"].get<int>();
 
                     if (msgid == SEND_FILE_SERVER) {
                         std::string filename = js["filename"].get<std::string>();
                         size_t fileSize = js["filesize"].get<size_t>();
-                        size_t totalSize = js["fileSize"].get<size_t>();
+                        size_t totalSize = fileSize;
 
                         std::cout << "要传输文件: " << filename << " 大小: " << fileSize << " bytes\n";
 

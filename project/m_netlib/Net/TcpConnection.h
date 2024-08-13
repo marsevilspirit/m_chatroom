@@ -38,6 +38,7 @@ public:
 
     void shutdown();
     void setTcpNoDelay(bool on);
+    void setTcpKeepAlive(bool on);
 
     void setContext(const std::any& context){ m_context = context; }
     const std::any& getContext() const { return m_context;}

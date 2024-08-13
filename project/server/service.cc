@@ -475,11 +475,40 @@ void Service::requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp 
     if(m_groupModel.addGroup(userid, groupid, "request")){
         response["msgid"] = REQUEST_GROUP_SUCCESS;
         conn->send(response.dump().append("\r\n"));
+
+        response_to_master_or_manager(groupid, userid);
         return;
     }
 
     response["msgid"] = REQUEST_GROUP_FAIL;
     conn->send(response.dump().append("\r\n"));
+}
+
+void Service::response_to_master_or_manager(int groupid, int userid){
+    std::vector<User> userVec = m_groupModel.queryGroupMember(groupid);
+
+    if (userVec.size() == 0)
+    {
+        std::cout << "no member in group" << std::endl;
+        return;
+    }
+
+    for (User &user : userVec)
+    {
+        std::cout << user.getId() << " " << user.getName() << " " << user.getState() << std::endl;
+        if (user.getState() == "master" || user.getState() == "manager")
+        {
+            auto it = m_userConnMap.find(user.getId());
+            if (it != m_userConnMap.end())
+            {
+                json response;
+                response["msgid"] = GROUP_REQUEST;
+                response["groupid"] = groupid;
+                response["userid"] = userid;
+                it->second->send(response.dump().append("\r\n"));
+            }
+        }
+    }
 }
 
 void Service::handleGroupRequestList(const TcpConnectionPtr &conn, json &js, Timestamp time){
@@ -529,6 +558,16 @@ void Service::handleAddSomeoneToGroup(const TcpConnectionPtr &conn, json &js, Ti
     json response;
     response["msgid"] = ADD_GROUP_SUCCESS;
     conn->send(response.dump().append("\r\n"));
+
+    json response2;
+    response2["msgid"] = GROUP_REQUEST_ACCEPTED;
+    response2["groupid"] = groupid;
+    response2["accept_id"] = m_connUserMap[conn];
+    auto it = m_userConnMap.find(userid);
+    if (it != m_userConnMap.end())
+    {
+        it->second->send(response2.dump().append("\r\n"));
+    }
 }
 
 void Service::handleQuitGroup(const TcpConnectionPtr &conn, json &js, Timestamp time){
@@ -560,6 +599,10 @@ void Service::handleShowOwnGroupList(const TcpConnectionPtr &conn, json &js, Tim
     std::vector<std::string> vec;
     for (Group &group : groupVec)
     {
+        if(group.getGroupRole() == "request" || group.getGroupRole() == ""){
+            continue;
+        }
+
         json js;
         js["id"] = group.getId();
         js["name"] = group.getName();
@@ -714,15 +757,9 @@ void Service::handleCheckIfGroupMember(const TcpConnectionPtr &conn, json &js, T
 
     std::string state = m_groupModel.queryGroupRole(userid, groupid);
 
-    if(state == ""){
-        state = "not";
-    } else {
-        state = "yes";
-    }
-
     json response;
     response["msgid"] = CHECK_IF_GROUP_MEMBER;
-    response["state"] = state == "yes";
+    response["state"] = !((state == "not")|| (state == "request"));
     conn->send(response.dump().append("\r\n"));
 }
 
@@ -809,6 +846,8 @@ void Service::handleDisplayFileList(const TcpConnectionPtr &conn, json &js, Time
 }
 
 void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time) {
+    LogInfo("Receive file")
+
     std::string filename = js["filename"];
     std::string filePath = "./received_files/" + filename;
 
@@ -956,41 +995,48 @@ void Service::handleDisplayGroupHistory(const TcpConnectionPtr &conn, json &js, 
     conn->send(response.dump().append("\r\n"));
 }
 
-void Service::checkIfConnAlive(){
+void Service::checkIfConnAlive() {
     std::lock_guard<std::mutex> lock(m_connMutex);
 
-    if(m_connStatusMap.size() == 0){
+    if (m_connStatusMap.empty()) {
         return;
     }
 
-    for (auto it = m_connStatusMap.begin(); it != m_connStatusMap.end(); ++it)
-    {
-        if (it->second == false)
-        {
-            int id = m_connUserMap[it->first];
-            LogInfo("心跳检测到用户 {} 掉线", id)
+    std::vector<std::shared_ptr<TcpConnection>> connectionsToDelete;
 
-            json response;
-            response["msgid"] = CLIENT_LONGTIME_EXIT;
-            m_userConnMap[id]->send(response.dump().append("\r\n"));
-
-            it->first->shutdown();
-            m_userConnMap.erase(id);
-            m_connUserMap.erase(it->first);
-            m_connStatusMap.erase(it->first);
-
-            User user = m_userModel.query(id);
-            user.setState("offline");
-            m_userModel.updateState(user);
+    // 首先收集需要删除的连接
+    for (auto it = m_connStatusMap.begin(); it != m_connStatusMap.end(); ++it) {
+        std::cout << "it->first:" << it->first << " it->second:" << it->second << std::endl;
+        if (it->second == false) {
+            connectionsToDelete.push_back(it->first);
+        } else {
+            it->second = false; // 重置心跳标志
         }
-        else
-        {
-            it->second = false;
+    }
+
+    // 然后删除那些已经确定需要删除的连接
+    for (const auto& conn : connectionsToDelete) {
+        int id = m_connUserMap[conn];
+        LogInfo("心跳检测到用户 {} 掉线", id);
+
+        json response;
+        response["msgid"] = CLIENT_LONGTIME_EXIT;
+        auto userConn = m_userConnMap.find(id);
+        if (userConn != m_userConnMap.end()) {
+            userConn->second->send(response.dump().append("\r\n"));
         }
 
-        if(m_connStatusMap.size() == 0){
-            break;
-        }
+        usleep(10000);
+
+        conn->shutdown();
+
+        m_userConnMap.erase(id);
+        m_connUserMap.erase(conn);
+        m_connStatusMap.erase(conn);
+
+        User user = m_userModel.query(id);
+        user.setState("offline");
+        m_userModel.updateState(user);
     }
 }
 

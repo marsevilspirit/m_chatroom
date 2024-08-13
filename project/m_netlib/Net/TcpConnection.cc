@@ -90,6 +90,10 @@ void TcpConnection::setTcpNoDelay(bool on){
     m_socket->setTcpNoDelay(on);
 }
 
+void TcpConnection::setTcpKeepAlive(bool on){
+    m_socket->setTcpKeepAlive(on);
+}
+
 void TcpConnection::shutdownInLoop(){
     m_loop->assertInLoopThread();
     if (!m_channel->isWriting()){
