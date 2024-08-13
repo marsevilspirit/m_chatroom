@@ -1134,6 +1134,7 @@ void masterDeleteGroup(Client &client){
     client.send(response.dump().append("\r\n"));
 }
 
+/*
 void sendfile(Client &client) {
     tellServerWantToLookFriendList(client);
     sem_wait(&show_friend_list);
@@ -1204,6 +1205,103 @@ void sendfile(Client &client) {
 
     client.send(response.dump().append("\r\n"));
 }
+*/
+
+void sendfile(Client &client) {
+    // 获取好友列表
+    tellServerWantToLookFriendList(client);
+    sem_wait(&show_friend_list);
+
+    // 选择要发送的好友
+    std::cout << "想发送给(id: -1 退出):" << std::endl;
+    std::string receiver_id;
+    std::cin >> receiver_id;
+
+    if (!isNumber(receiver_id)) {
+        std::cout << "请输入数字" << std::endl;
+        return;
+    }
+
+    if (receiver_id == "-1") {
+        return;
+    }
+
+    // 输入文件路径
+    std::cout << "请输入文件路径: " << std::endl;
+    std::string filePath;
+    std::cin >> filePath;
+    clearInputBuffer();
+
+    // 打开文件
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filePath << std::endl;
+        return;
+    }
+
+    // 获取文件大小
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::cout << "fileSize: " << fileSize << std::endl;
+
+    // 发送文件元数据
+    json metadata;
+    metadata["msgid"] = SEND_FILE;  // 标识这是一个文件传输
+    metadata["filename"] = filePath.substr(filePath.find_last_of("/\\") + 1);
+    metadata["filesize"] = fileSize;
+    client.send(metadata.dump().append("\r\n"));
+
+    usleep(10000);
+
+    // 获取客户端的文件描述符
+    int fd = client.fd();
+
+    // 逐块发送文件数据
+    size_t totalSent = 0;
+    char buffer[40960];
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+        std::cout << "Sending " << file.gcount() << " bytes" << std::endl;
+        usleep(1000);
+
+        size_t remaining = file.gcount();
+        const char* dataPtr = buffer;
+
+        // 使用send系统调用发送数据
+        while (remaining > 0) {
+            ssize_t sent = ::send(fd, dataPtr, remaining, 0);
+            if (sent < 0) {
+                std::cerr << "Send error: " << strerror(errno) << std::endl;
+                file.close();
+                return;
+            }
+            remaining -= sent;
+            dataPtr += sent;
+            totalSent += sent;
+        }
+
+        std::cout << "Progress: " << totalSent << "/" << fileSize << " bytes" << std::endl;
+    }
+
+    file.close();
+    std::cout << "File sent successfully." << std::endl;
+
+    // 发送传输结束标识
+    json endMessage;
+    endMessage["msgid"] = SEND_FILE_END;
+    ::send(fd, endMessage.dump().append("\r\n").c_str(), endMessage.dump().size() + 2, 0);
+
+    // 发送数据库更新信息
+    json response;
+    response["msgid"] = SEND_FILE_DATABASE;
+    response["filename"] = metadata["filename"];
+    response["sender"] = CurrentUser.getId();
+    response["receiver"] = std::stoi(receiver_id);
+
+    ::send(fd, response.dump().append("\r\n").c_str(), response.dump().size() + 2, 0);
+}
+
 
 void viewfile(Client &client) {
     json response;

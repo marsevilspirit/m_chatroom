@@ -32,6 +32,8 @@ public:
         }
     }
 
+    int fd() const { return m_connection->getFd(); }
+
 private:
     void onConnection(const TcpConnectionPtr &conn);
     void onMessage(const TcpConnectionPtr &conn, Buffer *buf);

@@ -33,6 +33,7 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
         std::cout << "buf->readableBytes():" << buf->readableBytes() << std::endl;
         // 判断是否在文件传输模式
         auto it = m_fileTransferStates.find(conn);
+        std::cout << "it == m_fileTransferStates.end():" << (it == m_fileTransferStates.end()) << std::endl;
         if (it == m_fileTransferStates.end()) {
             // 不在文件传输模式，处理普通消息
             const char* crlf = buf->findCRLF();

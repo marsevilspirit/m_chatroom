@@ -43,6 +43,8 @@ public:
     const std::any& getContext() const { return m_context;}
     std::any* getMutableContext() { return &m_context; }
 
+    int getFd() const { return m_socket->fd();}
+
 private:
     enum StateE { kConnecting, kConnected, kDisconnecting, kDisconnected };
 
