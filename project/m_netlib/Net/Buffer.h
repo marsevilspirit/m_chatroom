@@ -47,9 +47,17 @@ public:
     }
 
 
-    void retrieve(size_t len){
+    void retrieve(size_t len)
+    {
         assert(len <= readableBytes());
-        m_readIndex += len;
+        if (len < readableBytes())
+        {
+            m_readIndex += len;
+        }
+        else
+        {
+            retrieveAll();
+        }
     }
 
     void retrieveUntil(const char* end){

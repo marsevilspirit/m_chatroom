@@ -72,6 +72,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 break;
         case ADD_FRIEND_REQUEST:                std::cout << "你向对方发起好友申请" << std::endl;                                  
                                                 break;
+        case TO_ADD_FRIEND_REQUEST:             std::cout << "对方向你发起好友申请" << std::endl;                                  
+                                                break;
         case UPDATE_FRIEND_LIST:                std::cout << "更新好友列表" << std::endl;                                          
                                                 break;
         case DELETE_FRIEND_SUCCESS:             std::cout << "删除好友成功" << std::endl;                                       
@@ -1164,6 +1166,8 @@ void sendfile(Client &client) {
     size_t fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
+    std::cout << "fileSize: " << fileSize << std::endl;
+
     // 发送文件元数据
     json metadata;
     metadata["msgid"] = SEND_FILE; // 标识这是一个文件传输
@@ -1171,11 +1175,17 @@ void sendfile(Client &client) {
     metadata["filesize"] = fileSize;
     client.send(metadata.dump().append("\r\n"));
 
+    usleep(10000);
+
+    size_t totalSent = 0;
     // 逐块发送文件数据
-    char buffer[4096];
+    char buffer[40960];
     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+        std::cout << "Sending " << file.gcount() << " bytes" << std::endl;
+        usleep(1000);
         client.send(std::string(buffer, file.gcount()));
-        usleep(10);
+        totalSent += file.gcount();
+        std::cout << "Progress: " << totalSent << "/" << fileSize << " bytes" << std::endl;
     }
 
     file.close();

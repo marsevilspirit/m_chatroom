@@ -211,7 +211,14 @@ void Service::handleAddFriend(const TcpConnectionPtr &conn, json &js, Timestamp 
         json response;
         response["msgid"] = ADD_FRIEND_REQUEST;
         conn->send(response.dump().append("\r\n"));
-        return;
+
+        json response2;
+        response2["msgid"] = TO_ADD_FRIEND_REQUEST;
+        auto it = m_userConnMap.find(to_id);
+        if (it != m_userConnMap.end())
+        {
+            it->second->send(response2.dump().append("\r\n"));
+        }
     }
 
     if (state1 == "" && state2 == "request")
@@ -831,7 +838,7 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     char buffer[4096];
     while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
         conn->send(std::string(buffer, file.gcount()));
-        usleep(10);
+        usleep(1000);
     }
 
     file.close();

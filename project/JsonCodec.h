@@ -27,72 +27,83 @@ public:
     explicit JsonCodec(JsonMessageCallback cb)
         : m_messageCallback(std::move(cb)) {}
 
-    void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
-        while (buf->readableBytes() > 0) {
-            if (m_fileTransferStates.find(conn) == m_fileTransferStates.end()) {
-                // 不在文件传输模式
-                const char* crlf = buf->findCRLF();
-                if (crlf) {
-                    std::string jsonString(buf->peek(), crlf);
-                    buf->retrieveUntil(crlf + 2); // +2 to remove "\r\n"
+void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
+    std::cout << "outside buf->readableBytes():" << buf->readableBytes() << std::endl;
+    while (buf->readableBytes() > 0) {
+        std::cout << "buf->readableBytes():" << buf->readableBytes() << std::endl;
+        // 判断是否在文件传输模式
+        auto it = m_fileTransferStates.find(conn);
+        if (it == m_fileTransferStates.end()) {
+            // 不在文件传输模式，处理普通消息
+            const char* crlf = buf->findCRLF();
+            if (crlf) {
+                std::string jsonString(buf->peek(), crlf);
+                buf->retrieveUntil(crlf + 2); // +2 to remove "\r\n"
 
-                    try {
-                        json js = json::parse(jsonString);
-                        int msgid = js["msgid"].get<int>();
+                try {
+                    json js = json::parse(jsonString);
+                    int msgid = js["msgid"].get<int>();
 
-                        if (msgid == SEND_FILE || msgid == SEND_FILE_SERVER) {
-                            std::string filename = js["filename"].get<std::string>();
-                            size_t fileSize = js["filesize"].get<size_t>();
-                            
-                            std::string fullpath;
-                            
-                            if(msgid == SEND_FILE)
-                            {
-                                fullpath = "./received_files/" + filename;
-                            } else {
-                                fullpath = "./" + filename;
-                            }
+                    if (msgid == SEND_FILE || msgid == SEND_FILE_SERVER) {
+                        std::string filename = js["filename"].get<std::string>();
+                        size_t fileSize = js["filesize"].get<size_t>();
 
-                            auto outfile = std::make_shared<std::ofstream>(fullpath, std::ios::binary);
-                            if (!outfile->is_open()) {
-                                LogError("Failed to open file for writing: {}", fullpath);
-                                conn->shutdown();
-                                return;
-                            }
+                        std::cout << "要传输文件: " << filename << " 大小: " << fileSize << " bytes\n";
 
-                            // 将文件传输状态存储在 map 中
-                            m_fileTransferStates[conn] = {outfile, fileSize};
-                        } else if (msgid == SEND_FILE_END) {
-                            auto it = m_fileTransferStates.find(conn);
-                            if (it != m_fileTransferStates.end()) {
-                                it->second.outfile->close();
-                                m_fileTransferStates.erase(it); // 清除状态
-                            }
+                        std::string fullpath;
+                        if (msgid == SEND_FILE) {
+                            fullpath = "./received_files/" + filename;
                         } else {
-                            m_messageCallback(conn, js, time);
+                            fullpath = "./" + filename;
                         }
-                    } catch (const json::parse_error& e) {
-                        LogError("json parse error: {}", e.what());
-                        conn->shutdown();
+
+                        auto outfile = std::make_shared<std::ofstream>(fullpath, std::ios::binary);
+                        if (!outfile->is_open()) {
+                            LogError("Failed to open file for writing: {}", fullpath);
+                            conn->shutdown();
+                            return;
+                        }
+
+                        // 将文件传输状态存储在 map 中
+                        m_fileTransferStates[conn] = {outfile, fileSize};
+                    } else if (msgid == SEND_FILE_END) {
+                        auto it = m_fileTransferStates.find(conn);
+                        if (it != m_fileTransferStates.end()) {
+                            it->second.outfile->close();
+                            m_fileTransferStates.erase(it); // 清除状态
+                        }
+                    } else {
+                        std::cout << "执行m_messageCallback\n";
+                        m_messageCallback(conn, js, time);
                     }
-                } else {
-                    break; // not enough data to form a complete message
+                } catch (const json::parse_error& e) {
+                    LogError("json parse error: {}", e.what());
+                    std::cout << "json parse error\n";
+                    conn->shutdown();
                 }
             } else {
-                // 正在接收文件数据
-                auto& state = m_fileTransferStates[conn];
-                size_t readable = std::min(buf->readableBytes(), state.fileSize);
-                state.outfile->write(buf->peek(), readable);
-                buf->retrieve(readable);
+                std::cout << "not enough data to form a complete message\n";
+                break; // not enough data to form a complete message
+            }
+        } else {
+            // 正在接收文件数据
+            auto& state = it->second;
+            size_t readable = std::min(buf->readableBytes(), state.fileSize);
 
-                state.fileSize -= readable;
-                if (state.fileSize == 0) {
-                    state.outfile->close();
-                    m_fileTransferStates.erase(conn); // 清除状态
-                }
+            // 批量写入文件，减少写操作的次数
+            state.outfile->write(buf->peek(), readable);
+            buf->retrieve(readable);
+
+            state.fileSize -= readable;
+            std::cout << "剩余文件大小: " << state.fileSize << " bytes\n";
+            if (state.fileSize == 0) {
+                state.outfile->close();
+                m_fileTransferStates.erase(conn); // 清除状态
+                std::cout << "文件接收完成。" << std::endl;
             }
         }
     }
+}
 
     void send(const TcpConnectionPtr& conn, const json& message) {
         std::string jsonString = message.dump();
