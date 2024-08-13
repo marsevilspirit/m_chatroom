@@ -30,6 +30,9 @@ public:
 
     void setWriteCompleteCallback(const WriteCompleteCallback& cb){ m_writeCompleteCallback = cb;}
 
+    EventLoop* getNextLoop(){
+        return m_threadPool->getNextLoop();
+    }
 private:
 
     void newConnection(int sockfd, const InetAddress& peerAddr);

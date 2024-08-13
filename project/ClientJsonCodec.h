@@ -68,16 +68,13 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
                             m_fileTransferStates.erase(it); // 清除状态
                         }
                     } else {
-                        std::cout << "执行m_messageCallback\n";
                         m_messageCallback(conn, js, time);
                     }
                 } catch (const json::parse_error& e) {
                     LogError("json parse error: {}", e.what());
-                    std::cout << "json parse error\n";
                     conn->shutdown();
                 }
             } else {
-                std::cout << "not enough data to form a complete message\n";
                 break; // not enough data to form a complete message
             }
         } else {

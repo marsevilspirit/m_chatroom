@@ -1,7 +1,7 @@
 #include "service.h"
 #include "../public.h"
 #include "../m_netlib/Log/mars_logger.h"
-#include "../JsonCodec.h"
+#include "../ServerJsonCodec.h"
 #include "../model/user.h"
 #include "../model/group.h"
 #include "../model/historyCasheManager.h"
@@ -366,10 +366,6 @@ void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestam
     std::string from_name = js["from_name"];
     int to_id = js["id"];
 
-    LogInfo("{} want to send private message to {}", m_connUserMap[conn], to_id)
-
-    std::cout << "msg: " << msg << " from_name: " << from_name << " to_id: " << to_id << std::endl;
-
     json response;
     response["msgid"] = PRIVATE_CHAT;
     response["msg"] = msg;
@@ -377,8 +373,6 @@ void Service::handlePrivateChat(const TcpConnectionPtr &conn, json &js, Timestam
     response["time"] = time.toFormattedString();
 
     cacheManager->storePrivateMessageInCache(std::to_string(m_connUserMap[conn]), std::to_string(to_id), msg);
-
-    std::cout << "finish store private message in cache" << std::endl;
 
     auto it = m_userConnMap.find(to_id); 
     if (it != m_userConnMap.end())
@@ -697,6 +691,7 @@ void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, T
             conn->send(response.dump().append("\r\n"));
             return;
         }
+
         m_groupModel.deleteGroupMember(userid, groupid);
         m_groupUserListMap[groupid].erase(std::remove(m_groupUserListMap[groupid].begin(), m_groupUserListMap[groupid].end(), userid), m_groupUserListMap[groupid].end());
 

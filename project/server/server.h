@@ -16,6 +16,9 @@ public:
     Server(EventLoop* loop, const InetAddress& listenAddr);
     void start();
 
+    EventLoop* getNextLoop(){
+        return m_server.getNextLoop();
+    }
 private:
     void onConnection(const TcpConnectionPtr& conn);
     void onMessage(const TcpConnectionPtr& conn, Buffer* buf, base::Timestamp time);

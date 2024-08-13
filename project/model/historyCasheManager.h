@@ -52,9 +52,8 @@ public:
     }
 
     void flushCacheToDatabase() {
-        LogTrace("Flushing cache to database...");
+        LogInfo("Flushing cache to database...");
         flushPrivateChatCache();
-
         flushGroupChatCache();
     }
 
