@@ -5,7 +5,7 @@
 
 #include "../m_netlib/Net/TcpClient.h"
 #include "../m_netlib/Net/EventLoop.h"
-#include "../JsonCodec.h"
+#include "../ClientJsonCodec.h"
 
 using namespace mars;
 using namespace mars::net;

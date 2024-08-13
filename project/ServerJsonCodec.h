@@ -1,7 +1,7 @@
 //Created by mars on 7/8/24
 
-#ifndef  JSON_CODEC_H
-#define  JSON_CODEC_H
+#ifndef  SERVER_JSON_CODEC_H
+#define  SERVER_JSON_CODEC_H
 
 #include "json.hpp"
 #include "m_netlib/Net/TcpConnection.h"
@@ -28,12 +28,9 @@ public:
         : m_messageCallback(std::move(cb)) {}
 
 void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
-    std::cout << "outside buf->readableBytes():" << buf->readableBytes() << std::endl;
     while (buf->readableBytes() > 0) {
-        std::cout << "buf->readableBytes():" << buf->readableBytes() << std::endl;
         // 判断是否在文件传输模式
         auto it = m_fileTransferStates.find(conn);
-        std::cout << "it == m_fileTransferStates.end():" << (it == m_fileTransferStates.end()) << std::endl;
         if (it == m_fileTransferStates.end()) {
             // 不在文件传输模式，处理普通消息
             const char* crlf = buf->findCRLF();
@@ -45,18 +42,13 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
                     json js = json::parse(jsonString);
                     int msgid = js["msgid"].get<int>();
 
-                    if (msgid == SEND_FILE || msgid == SEND_FILE_SERVER) {
+                    if (msgid == SEND_FILE) {
                         std::string filename = js["filename"].get<std::string>();
                         size_t fileSize = js["filesize"].get<size_t>();
 
                         std::cout << "要传输文件: " << filename << " 大小: " << fileSize << " bytes\n";
 
-                        std::string fullpath;
-                        if (msgid == SEND_FILE) {
-                            fullpath = "./received_files/" + filename;
-                        } else {
-                            fullpath = "./" + filename;
-                        }
+                        std::string fullpath = "./received_files/" + filename;
 
                         auto outfile = std::make_shared<std::ofstream>(fullpath, std::ios::binary);
                         if (!outfile->is_open()) {
@@ -117,4 +109,4 @@ private:
     std::unordered_map<TcpConnectionPtr, FileTransferState> m_fileTransferStates;
 };
 
-#endif //JSON_CODEC_H
+#endif //SERVER_JSON_CODEC_H

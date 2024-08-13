@@ -10,6 +10,11 @@
 #include <atomic>
 #include <unistd.h>
 #include <termios.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 sem_t reg_sem;
 sem_t login_sem;
@@ -1233,16 +1238,20 @@ void sendfile(Client &client) {
     clearInputBuffer();
 
     // 打开文件
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open()) {
+    int file_fd = open(filePath.c_str(), O_RDONLY);
+    if (file_fd < 0) {
         std::cerr << "Failed to open file: " << filePath << std::endl;
         return;
     }
 
     // 获取文件大小
-    file.seekg(0, std::ios::end);
-    size_t fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
+    struct stat file_stat;
+    if (fstat(file_fd, &file_stat) < 0) {
+        std::cerr << "Failed to get file size: " << filePath << std::endl;
+        close(file_fd);
+        return;
+    }
+    size_t fileSize = file_stat.st_size;
 
     std::cout << "fileSize: " << fileSize << std::endl;
 
@@ -1256,41 +1265,53 @@ void sendfile(Client &client) {
     usleep(10000);
 
     // 获取客户端的文件描述符
-    int fd = client.fd();
+    int socket_fd = client.fd();
 
+    // 获取当前文件描述符的标志
+    int flags = fcntl(socket_fd, F_GETFL, 0);
+    if (flags < 0) {
+        std::cerr << "Failed to get file descriptor flags: " << strerror(errno) << std::endl;
+        return;
+    }
+
+    // 设置为阻塞模式
+    if (fcntl(socket_fd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
+        std::cerr << "Failed to set blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
     // 逐块发送文件数据
+    off_t offset = 0;
     size_t totalSent = 0;
-    char buffer[40960];
-    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-        std::cout << "Sending " << file.gcount() << " bytes" << std::endl;
-        usleep(1000);
-
-        size_t remaining = file.gcount();
-        const char* dataPtr = buffer;
-
-        // 使用send系统调用发送数据
-        while (remaining > 0) {
-            ssize_t sent = ::send(fd, dataPtr, remaining, 0);
-            if (sent < 0) {
-                std::cerr << "Send error: " << strerror(errno) << std::endl;
-                file.close();
+    while (totalSent < fileSize) {
+        ssize_t sent = sendfile(socket_fd, file_fd, &offset, fileSize - totalSent);
+        if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 暂时不可用，稍后重试
+                usleep(10000); // 10ms 延迟
+                continue;
+            } else {
+                std::cerr << "Sendfile error: " << strerror(errno) << std::endl;
+                close(file_fd);
                 return;
             }
-            remaining -= sent;
-            dataPtr += sent;
-            totalSent += sent;
         }
-
+        totalSent += sent;
         std::cout << "Progress: " << totalSent << "/" << fileSize << " bytes" << std::endl;
     }
 
-    file.close();
+    close(file_fd);
     std::cout << "File sent successfully." << std::endl;
+
+    // 恢复为非阻塞模式
+    if (fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        std::cerr << "Failed to restore non-blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
 
     // 发送传输结束标识
     json endMessage;
     endMessage["msgid"] = SEND_FILE_END;
-    ::send(fd, endMessage.dump().append("\r\n").c_str(), endMessage.dump().size() + 2, 0);
+    ::send(socket_fd, endMessage.dump().append("\r\n").c_str(), endMessage.dump().size() + 2, 0);
 
     // 发送数据库更新信息
     json response;
@@ -1299,7 +1320,7 @@ void sendfile(Client &client) {
     response["sender"] = CurrentUser.getId();
     response["receiver"] = std::stoi(receiver_id);
 
-    ::send(fd, response.dump().append("\r\n").c_str(), response.dump().size() + 2, 0);
+    ::send(socket_fd, response.dump().append("\r\n").c_str(), response.dump().size() + 2, 0);
 }
 
 

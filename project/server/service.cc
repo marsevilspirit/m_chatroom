@@ -10,6 +10,9 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
 
 extern std::shared_ptr<CacheManager> cacheManager;
 
@@ -807,43 +810,90 @@ void Service::handleDisplayFileList(const TcpConnectionPtr &conn, json &js, Time
     conn->send(response.dump().append("\r\n"));
 }
 
-void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time){
+void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestamp time) {
     std::string filename = js["filename"];
-
     std::string filePath = "./received_files/" + filename;
 
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filePath << std::endl;
+    // 打开文件
+    int fileFd = open(filePath.c_str(), O_RDONLY);
+    if (fileFd < 0) {
+        std::cerr << "Failed to open file: " << filePath << " - " << strerror(errno) << std::endl;
         json response;
         response["msgid"] = RECEIVE_FILE_FAIL;
         conn->send(response.dump().append("\r\n"));
         return;
     }
 
-    file.seekg(0, std::ios::end);
-    size_t fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
+    // 获取文件大小
+    struct stat fileStat;
+    if (fstat(fileFd, &fileStat) < 0) {
+        std::cerr << "Failed to get file stats: " << strerror(errno) << std::endl;
+        close(fileFd);
+        return;
+    }
+    size_t fileSize = fileStat.st_size;
 
-    m_userConnMap.erase(m_connUserMap[conn]); // 防止发送文件时，群聊信息干扰
+    std::cout << "fileSize: " << fileSize << std::endl;
+
+    // 移除当前连接与用户映射，防止群聊信息干扰
+    m_userConnMap.erase(m_connUserMap[conn]);
 
     // 发送文件元数据
     json metadata;
-    metadata["msgid"] = SEND_FILE_SERVER; // 标识这是一个文件传输
-    metadata["filename"] = filePath.substr(filePath.find_last_of("/\\") + 1);
+    metadata["msgid"] = SEND_FILE_SERVER;  // 标识这是一个文件传输
+    metadata["filename"] = filename;
     metadata["filesize"] = fileSize;
     conn->send(metadata.dump().append("\r\n"));
 
-    // 发送文件数据
-    char buffer[4096];
-    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-        conn->send(std::string(buffer, file.gcount()));
-        usleep(1000);
+    usleep(10000);
+
+    // 获取连接的文件描述符
+    int connFd = conn->getFd();
+
+    // 获取当前文件描述符的标志
+    int flags = fcntl(connFd, F_GETFL, 0);
+    if (flags < 0) {
+        std::cerr << "Failed to get file descriptor flags: " << strerror(errno) << std::endl;
+        return;
     }
 
-    file.close();
+    // 设置为阻塞模式
+    if (fcntl(connFd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
+        std::cerr << "Failed to set blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
+
+    // 逐块发送文件数据
+    off_t offset = 0;
+    size_t remaining = fileSize;
+    while (remaining > 0) {
+        ssize_t sent = sendfile(connFd, fileFd, &offset, remaining);
+        if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 暂时不可用，稍后重试
+                usleep(10000); // 10ms 延迟
+                continue;
+            } else {
+                std::cerr << "Sendfile error: " << strerror(errno) << std::endl;
+                close(fileFd);
+                return;
+            }
+        }
+        remaining -= sent;
+
+        std::cout << "Progress: " << (fileSize - remaining) << "/" << fileSize << " bytes" << std::endl;
+    }
+
+    close(fileFd);
     std::cout << "File sent successfully." << std::endl;
 
+    // 恢复为非阻塞模式
+    if (fcntl(connFd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        std::cerr << "Failed to restore non-blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
+
+    // 重新添加当前连接与用户的映射
     m_userConnMap[m_connUserMap[conn]] = conn;
 
     // 发送传输结束标识
@@ -851,10 +901,10 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     endMessage["msgid"] = SEND_FILE_END;
     conn->send(endMessage.dump().append("\r\n"));
 
+    // 发送文件接收完成的消息
     json response;
     response["msgid"] = RECEIVE_FILE_FINISH;
     conn->send(response.dump().append("\r\n"));
-
 }
 
 void Service::handleDisplayPrivateHistory(const TcpConnectionPtr &conn, json &js, Timestamp time){
