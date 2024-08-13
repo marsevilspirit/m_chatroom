@@ -431,12 +431,15 @@ void Service::handleCreateGroup(const TcpConnectionPtr &conn, json &js, Timestam
     group.setName(group_name);
 
     if (m_groupModel.createGroup(group)){
+
         m_groupModel.addGroup(userid, group.getId(), "master");
+        m_groupUserListMap[group.getId()].push_back(userid);
+
         json response;
         response["msgid"] = CREATE_GROUP_SUCCESS;
         conn->send(response.dump().append("\r\n"));
         return;
-    } 
+    }
 
     json response;
     response["msgid"] = CREATE_GROUP_FAIL;

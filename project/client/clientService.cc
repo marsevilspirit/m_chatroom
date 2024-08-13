@@ -5,11 +5,9 @@
 #include "../model/user.h"
 
 #include <iostream>
-#include <limits>
 #include <semaphore.h> 
 #include <atomic>
 #include <unistd.h>
-#include <termios.h>
 #include <fcntl.h>
 #include <sys/sendfile.h>
 #include <sys/types.h>
@@ -41,12 +39,6 @@ std::atomic<bool> if_group_member(false);
 std::atomic<int> private_chat_id(-1);
 
 User CurrentUser;
-
-static void clearInputBuffer() 
-{
-    std::cin.clear(); // 清除输入状态标志
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // 忽略剩余输入
-}
 
 void handleServerMessage(Client* client, json &js, Timestamp time){
     int msgid = js["msgid"].get<int>();
@@ -246,28 +238,6 @@ void EnterChatRoom(Client &client){
 
 }
 
-std::string getPassword() {
-    std::string password;
-    char ch;
-    struct termios oldt, newt;
-
-    // 获取终端的当前属性
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-
-    // 关闭回显功能
-    newt.c_lflag &= ~(ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-
-    // 输入密码
-    std::getline(std::cin, password);
-
-    // 恢复终端的原始属性
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    std::cout << std::endl;
-
-    return password;
-}
 
 bool isNumber(const std::string& s) {
     return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);

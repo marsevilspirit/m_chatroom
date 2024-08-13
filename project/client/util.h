@@ -13,4 +13,8 @@
 //用哈希函数给密码加密
 std::string passwordToSha256(const std::string &password);
 
+void clearInputBuffer();
+
+std::string getPassword();
+
 #endif //MARS_UTIL_H

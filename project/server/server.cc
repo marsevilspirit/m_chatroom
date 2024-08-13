@@ -49,8 +49,6 @@ void Server::onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time
 {
     std::string str = buf->retrieveAsString(); // 这里可能会出现问题 原来是 buf->retrieveAllAsString()
 
-    LogTrace("Message: {}", str)
-
     json js = json::parse(str);
 
     // 通过消息id获取对应的处理器
@@ -64,8 +62,6 @@ void Server::onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time
 void Server::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp time)
 {
     Service::getInstance()->setConnStatus(conn, true);
-
-    LogTrace("Message: {}", js.dump())
 
     // 通过消息id获取对应的处理器
     int msgid = js["msgid"].get<int>();

@@ -1,4 +1,7 @@
 #include "util.h"
+#include <limits>
+#include <termios.h>
+#include <unistd.h>
 
 // 将字节数组转换为十六进制字符串
 std::string bytesToHex(const unsigned char* bytes, size_t length)
@@ -53,3 +56,33 @@ std::string passwordToSha256(const std::string &password)
 
     return bytesToHex(hash, hash_len);
 }
+
+void clearInputBuffer() 
+{
+    std::cin.clear(); // 清除输入状态标志
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // 忽略剩余输入
+}
+
+std::string getPassword() {
+    std::string password;
+    char ch;
+    struct termios oldt, newt;
+
+    // 获取终端的当前属性
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+
+    // 关闭回显功能
+    newt.c_lflag &= ~(ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    // 输入密码
+    std::getline(std::cin, password);
+
+    // 恢复终端的原始属性
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    std::cout << std::endl;
+
+    return password;
+}
+
