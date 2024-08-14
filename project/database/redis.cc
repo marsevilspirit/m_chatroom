@@ -7,12 +7,12 @@ Redis::~Redis() {}
 
 bool Redis::connect() {
     // 初始化连接池（可选）
-    RedisConnectionPool::getInstance().init("127.0.0.1", 6379, 10);
+    RedisPool::getInstance().init("127.0.0.1", 6379, 10);
     return true;
 }
 
 bool Redis::rpush(const std::string &key, const std::string &value) {
-    redisContext* context = RedisConnectionPool::getInstance().getConnection();
+    redisContext* context = RedisPool::getInstance().getConnection();
     if (!context) {
         return false;
     }
@@ -20,7 +20,7 @@ bool Redis::rpush(const std::string &key, const std::string &value) {
     std::unique_ptr<redisReply, RedisReplyDeleter> reply(
         (redisReply*)redisCommand(context, "RPUSH %s %s", key.c_str(), value.c_str()));
 
-    RedisConnectionPool::getInstance().releaseConnection(context);
+    RedisPool::getInstance().releaseConnection(context);
 
     if (!reply || reply->type == REDIS_REPLY_ERROR) {
         LogWarn("RPUSH to Redis failed: {}", reply ? reply->str : "null reply");
@@ -30,7 +30,7 @@ bool Redis::rpush(const std::string &key, const std::string &value) {
 }
 
 std::vector<std::string> Redis::lrange(const std::string &key, int start, int end) {
-    redisContext* context = RedisConnectionPool::getInstance().getConnection();
+    redisContext* context = RedisPool::getInstance().getConnection();
     if (!context) {
         return {};
     }
@@ -39,7 +39,7 @@ std::vector<std::string> Redis::lrange(const std::string &key, int start, int en
         (redisReply*)redisCommand(context, "LRANGE %s %d %d", key.c_str(), start, end));
     std::vector<std::string> result;
 
-    RedisConnectionPool::getInstance().releaseConnection(context);
+    RedisPool::getInstance().releaseConnection(context);
 
     if (reply && reply->type == REDIS_REPLY_ARRAY) {
         for (size_t i = 0; i < reply->elements; i++) {
@@ -52,7 +52,7 @@ std::vector<std::string> Redis::lrange(const std::string &key, int start, int en
 }
 
 void Redis::ltrim(const std::string &key, int start, int end) {
-    redisContext* context = RedisConnectionPool::getInstance().getConnection();
+    redisContext* context = RedisPool::getInstance().getConnection();
     if (!context) {
         return;
     }
@@ -60,7 +60,7 @@ void Redis::ltrim(const std::string &key, int start, int end) {
     std::unique_ptr<redisReply, RedisReplyDeleter> reply(
         (redisReply*)redisCommand(context, "LTRIM %s %d %d", key.c_str(), start, end));
 
-    RedisConnectionPool::getInstance().releaseConnection(context);
+    RedisPool::getInstance().releaseConnection(context);
 
     if (!reply || reply->type == REDIS_REPLY_ERROR) {
         LogWarn("LTRIM in Redis failed: {}", reply ? reply->str : "null reply");
