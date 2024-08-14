@@ -76,81 +76,126 @@ private:
     return input;
     }
 
-    void flushPrivateChatCache() {
-        std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
+void flushPrivateChatCache() {
+    // 从 Redis 中获取缓存的消息
+    std::vector<std::string> cachedMessages = redis.lrange("private_chat_cache", 0, -1);
 
-        if (cachedMessages.empty()) {
-            return;
-        }
-
-        auto mysql = MysqlPool::getInstance().getConnection();
-        if (!mysql) {
-            LogWarn("Failed to get MySQL connection from pool");
-            return;
-        }
-
-        for (const auto &record_str : cachedMessages) {
-            // 使用 nlohmann::json 解析 JSON 字符串
-            json record = json::parse(record_str);
-
-            // 提取字段
-            std::string sender_id = record["sender_id"];
-            std::string receiver_id = record["receiver_id"];
-            std::string message = record["message"];
-            std::string timestamp = record["timestamp"];
-
-            std::string escapedMessage = escapeSingleQuotes(message);
-
-            std::string sql = "INSERT INTO private_chat_history(sender_id, receiver_id, message, timestamp) VALUES('"
-                      + sender_id + "', '" + receiver_id + "', '" + escapedMessage + "', '" + timestamp + "')";
-
-            if (!mysql->update(sql)) {
-                LogWarn("Failed to insert private message into MySQL");
-            }
-        }
-        // 清空 Redis 缓存
-        redis.ltrim("private_chat_cache", 1, 0);
-
-        MysqlPool::getInstance().releaseConnection(mysql);
+    if (cachedMessages.empty()) {
+        return;
     }
 
-    void flushGroupChatCache() {
-        std::vector<std::string> cachedMessages = redis.lrange("group_chat_cache", 0, -1);
-
-        if (cachedMessages.empty()) {
-            return;
-        }
-
-        auto mysql = MysqlPool::getInstance().getConnection();
-        if (!mysql) {
-            LogWarn("Failed to get MySQL connection from pool");
-            return;
-        }
-
-        for (const auto &record_str : cachedMessages) {
-            // 使用 nlohmann::json 解析 JSON 字符串
-            json record = json::parse(record_str);
-
-            // 提取字段
-            std::string group_id = record["group_id"];
-            std::string sender_id = record["sender_id"];
-            std::string message = record["message"];
-            std::string timestamp = record["timestamp"];
-
-            std::string escapedMessage = escapeSingleQuotes(message);
-
-            std::string sql = "INSERT INTO group_chat_history(group_id, sender_id, message, timestamp) VALUES('"
-                      + group_id + "', '" + sender_id + "', '" + escapedMessage + "', '" + timestamp + "')";
-
-            if (!mysql->update(sql)) {
-                LogWarn("Failed to insert group message into MySQL");
-            }
-        }
-        // 清空 Redis 缓存
-        redis.ltrim("group_chat_cache", 1, 0);
-
-        MysqlPool::getInstance().releaseConnection(mysql);
+    // 获取 MySQL 连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (!mysql) {
+        LogWarn("Failed to get MySQL connection from pool");
+        return;
     }
+
+    // 开始事务
+    mysql->startTransaction();
+
+    // 批量插入构造
+    std::stringstream ss;
+    ss << "INSERT INTO private_chat_history (sender_id, receiver_id, message, timestamp) VALUES ";
+
+    bool first = true;
+    for (const auto &record_str : cachedMessages) {
+        // 使用 nlohmann::json 解析 JSON 字符串
+        nlohmann::json record = nlohmann::json::parse(record_str);
+
+        // 提取字段
+        std::string sender_id = record["sender_id"];
+        std::string receiver_id = record["receiver_id"];
+        std::string message = record["message"];
+        std::string timestamp = record["timestamp"];
+
+        std::string escapedMessage = escapeSingleQuotes(message);
+
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+        ss << "('" << sender_id << "', '" << receiver_id << "', '" << escapedMessage << "', '" << timestamp << "')";
+    }
+    ss << ";";
+
+    // 执行批量插入
+    if (!mysql->update(ss.str())) {
+        LogWarn("Failed to insert private messages into MySQL");
+        mysql->rollback();
+        MysqlPool::getInstance().releaseConnection(mysql);
+        return;
+    }
+
+    // 提交事务
+    mysql->commit();
+
+    // 清空 Redis 缓存
+    redis.ltrim("private_chat_cache", 1, 0);
+
+    // 释放 MySQL 连接
+    MysqlPool::getInstance().releaseConnection(mysql);
+}
+void flushGroupChatCache() {
+    // 从 Redis 中获取缓存的消息
+    std::vector<std::string> cachedMessages = redis.lrange("group_chat_cache", 0, -1);
+
+    if (cachedMessages.empty()) {
+        return;
+    }
+
+    // 获取 MySQL 连接
+    auto mysql = MysqlPool::getInstance().getConnection();
+    if (!mysql) {
+        LogWarn("Failed to get MySQL connection from pool");
+        return;
+    }
+
+    // 开始事务
+    mysql->startTransaction();
+
+    // 批量插入构造
+    std::stringstream ss;
+    ss << "INSERT INTO group_chat_history (group_id, sender_id, message, timestamp) VALUES ";
+
+    bool first = true;
+    for (const auto &record_str : cachedMessages) {
+        // 使用 nlohmann::json 解析 JSON 字符串
+        nlohmann::json record = nlohmann::json::parse(record_str);
+
+        // 提取字段
+        std::string group_id = record["group_id"];
+        std::string sender_id = record["sender_id"];
+        std::string message = record["message"];
+        std::string timestamp = record["timestamp"];
+
+        std::string escapedMessage = escapeSingleQuotes(message);
+
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+        ss << "('" << group_id << "', '" << sender_id << "', '" << escapedMessage << "', '" << timestamp << "')";
+    }
+    ss << ";";
+
+    // 执行批量插入
+    if (!mysql->update(ss.str())) {
+        LogWarn("Failed to insert group messages into MySQL");
+        mysql->rollback();
+        MysqlPool::getInstance().releaseConnection(mysql);
+        return;
+    }
+
+    // 提交事务
+    mysql->commit();
+
+    // 清空 Redis 缓存
+    redis.ltrim("group_chat_cache", 1, 0);
+
+    // 释放 MySQL 连接
+    MysqlPool::getInstance().releaseConnection(mysql);
+}
 };
 
 #endif //HISTORYCACHEMANAGER_H

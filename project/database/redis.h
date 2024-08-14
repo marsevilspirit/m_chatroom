@@ -19,6 +19,14 @@ public:
 
 private:
     redisContext* m_context;
+
+    struct RedisReplyDeleter {
+        void operator()(redisReply* reply) const {
+            if (reply) {
+                freeReplyObject(reply);
+            }
+        }
+    };
 };
 
 #endif //REDIS_H

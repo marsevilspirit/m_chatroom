@@ -30,6 +30,8 @@ public:
 
     void groupUserListMapInit();
 
+    void UserstateInit();
+
     // 想要进入房间
     void wantEnter(const TcpConnectionPtr &conn, json &js, Timestamp time);
 

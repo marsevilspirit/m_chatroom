@@ -81,7 +81,7 @@ public:
         try{
             log = LogHead(level) + fmt::format(fmt, args...) + LogDetail(file_name, func_name, line_no);
         } catch (const std::exception& e) {
-            std::cerr << "Error in log format: " << e.what() << " in " << __FILE__ << " at line " << __LINE__ << '\n';
+            std::cerr << "Error in log format: " << e.what() << " in " << file_name << " at " << func_name << " line " << line_no << '\n';
             return;
         }
 

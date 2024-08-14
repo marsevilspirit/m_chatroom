@@ -73,6 +73,19 @@ void Service::groupUserListMapInit(){
     }
 }
 
+void Service::UserstateInit(){
+    LogInfo("Userstate init")
+
+    std::vector<User> userVec = m_userModel.query();
+    for (User &user : userVec)
+    {
+        if(user.getState() == "online"){
+            user.setState("offline");
+            m_userModel.updateState(user);
+        }
+    }
+}
+
 void Service::reset() {
     // 把online状态的用户，设置成offline
     LogWarn("server reset");
@@ -1002,7 +1015,7 @@ void Service::checkIfConnAlive() {
         return;
     }
 
-    std::vector<std::shared_ptr<TcpConnection>> connectionsToDelete;
+    std::vector<std::weak_ptr<TcpConnection>> connectionsToDelete;
 
     // 首先收集需要删除的连接
     for (auto it = m_connStatusMap.begin(); it != m_connStatusMap.end(); ++it) {
@@ -1014,55 +1027,53 @@ void Service::checkIfConnAlive() {
     }
 
     // 然后删除那些已经确定需要删除的连接
-    for (const auto& conn : connectionsToDelete) {
-        int id = m_connUserMap[conn];
-        LogInfo("心跳检测到用户 {} 掉线", id);
+    for (const auto& weakConn : connectionsToDelete) {
+        auto conn = weakConn.lock();
+        if (conn) {
+            int id = m_connUserMap[conn];
+            LogInfo("心跳检测到用户 {} 掉线", id);
 
-        json response;
-        response["msgid"] = CLIENT_LONGTIME_EXIT;
-        auto userConn = m_userConnMap.find(id);
-        if (userConn != m_userConnMap.end()) {
-            userConn->second->send(response.dump().append("\r\n"));
+            json response;
+            response["msgid"] = CLIENT_LONGTIME_EXIT;
+            auto userConn = m_userConnMap.find(id);
+            if (userConn != m_userConnMap.end()) {
+                userConn->second->send(response.dump().append("\r\n"));
+            }
+
+            usleep(10000);
+
+            conn->shutdown();
+
+            m_userConnMap.erase(id);
+            m_connUserMap.erase(conn);
+            m_connStatusMap.erase(conn);
+
+            User user = m_userModel.query(id);
+            user.setState("offline");
+            m_userModel.updateState(user);
         }
-
-        usleep(10000);
-
-        conn->shutdown();
-
-        m_userConnMap.erase(id);
-        m_connUserMap.erase(conn);
-        m_connStatusMap.erase(conn);
-
-        User user = m_userModel.query(id);
-        user.setState("offline");
-        m_userModel.updateState(user);
     }
 }
 
 // 处理客户端异常退出
-void Service::clientClose(const TcpConnectionPtr &conn){
-    LogInfo("client {} close", m_connUserMap[conn]);
-
-    User user;
+void Service::clientClose(const TcpConnectionPtr &conn) {
+    int userId = -1;
     {
         std::lock_guard<std::mutex> lock(m_connMutex);
-        for (auto it = m_userConnMap.begin(); it != m_userConnMap.end(); ++it)
-        {
-            if (it->second == conn)
-            {
-                // 从map表删除用户的链接信息
-                user.setId(it->first);
-                m_userConnMap.erase(it);
-                m_connUserMap.erase(it->second);
-                m_connStatusMap.erase(it->second);
-                break;
-            }
+        auto it = m_connUserMap.find(conn);
+        if (it != m_connUserMap.end()) {
+            userId = it->second;
+            LogInfo("client {} close", userId);
+
+            m_connStatusMap.erase(conn);
+            m_connUserMap.erase(conn);
+            m_userConnMap.erase(userId);
         }
     }
 
     // 更新用户的状态信息
-    if (user.getId() != -1)   //没找到这个 ，id就是默认的构造函数设置的-1，不等于-1说明是有效的用户
-    {
+    if (userId != -1) {
+        User user = m_userModel.query(userId);
         user.setState("offline");
         m_userModel.updateState(user);
     }

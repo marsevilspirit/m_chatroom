@@ -69,3 +69,21 @@ MYSQL* MySQL::getConnection()
 {
     return m_conn;
 }
+
+// 开启事务
+void MySQL::startTransaction()
+{
+    update("START TRANSACTION");
+}
+
+// 提交事务
+void MySQL::commit()
+{
+    update("COMMIT");
+}
+
+// 回滚事务
+void MySQL::rollback()
+{
+    update("ROLLBACK");
+}

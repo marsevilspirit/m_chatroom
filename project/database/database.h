@@ -19,6 +19,12 @@ public:
     MYSQL* getConnection();
 
     bool connect();
+
+    void startTransaction();
+
+    void commit();
+
+    void rollback();
 private:
 
     MYSQL *m_conn;

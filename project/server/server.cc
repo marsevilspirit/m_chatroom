@@ -23,6 +23,7 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr)
     m_server.setThreadNum(32);
 
     Service::getInstance()->groupUserListMapInit();
+    Service::getInstance()->UserstateInit();
 }
 
 void Server::start()
