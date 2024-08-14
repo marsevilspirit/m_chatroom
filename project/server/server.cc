@@ -39,7 +39,6 @@ void Server::onConnection(const TcpConnectionPtr &conn)
     }
     else
     {
-        std::cout << "onConnection(): connection [" << conn->name() << "] is down" << std::endl;
         LogInfo("onConnection(): connection [{}] is down", conn->name())
         Service::getInstance()->clientClose(conn);
         conn->shutdown();

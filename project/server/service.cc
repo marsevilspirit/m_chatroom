@@ -493,6 +493,14 @@ void Service::requestAddGroup(const TcpConnectionPtr &conn, json &js, Timestamp 
         return;
     }
 
+    if(m_groupModel.ifMasterOrManagerORnormal(userid, groupid))
+    {
+        response["msgid"] = ALREADY_IN_GROUP;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
+
+
     response["msgid"] = REQUEST_GROUP_FAIL;
     conn->send(response.dump().append("\r\n"));
 }
@@ -508,7 +516,6 @@ void Service::response_to_master_or_manager(int groupid, int userid){
 
     for (User &user : userVec)
     {
-        std::cout << user.getId() << " " << user.getName() << " " << user.getState() << std::endl;
         if (user.getState() == "master" || user.getState() == "manager")
         {
             auto it = m_userConnMap.find(user.getId());
@@ -705,6 +712,15 @@ void Service::handleSetManager(const TcpConnectionPtr &conn, json &js, Timestamp
     json response;
     response["msgid"] = SET_MANAGER_SUCCESS;
     conn->send(response.dump().append("\r\n"));
+
+    json response2;
+    response2["msgid"] = SET_MANAGER_NOTICE;
+    response2["groupid"] = groupid;
+    auto it = m_userConnMap.find(userid);
+    if (it != m_userConnMap.end())
+    {
+        it->second->send(response2.dump().append("\r\n"));
+    }
 }
 
 void Service::handleCancelManager(const TcpConnectionPtr &conn, json &js, Timestamp time){
@@ -735,6 +751,13 @@ void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, T
 
     std::string kick_state = m_groupModel.queryGroupRole(m_connUserMap[conn], groupid); 
     std::string be_kick_state = m_groupModel.queryGroupRole(userid, groupid);
+
+    if (be_kick_state == "" || be_kick_state == "request"){
+        json response;
+        response["msgid"] = KICK_SOMEONE_NOT_IN_GROUP;
+        conn->send(response.dump().append("\r\n"));
+        return;
+    }
 
     if (kick_state == "master"){
         m_groupModel.deleteGroupMember(userid, groupid);

@@ -46,7 +46,7 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
                         std::string filename = js["filename"].get<std::string>();
                         size_t fileSize = js["filesize"].get<size_t>();
 
-                        std::cout << "要传输文件: " << filename << " 大小: " << fileSize << " bytes\n";
+                        LogInfo("要传输文件: {} 大小: {} bytes", filename, fileSize)
 
                         std::string fullpath = "./received_files/" + filename;
 
@@ -69,10 +69,11 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
                         m_messageCallback(conn, js, time);
                     }
                 } catch (const json::parse_error& e) {
-                    std::cout << "json parse error\n";
+                    LogError("json parse error: {}", e.what())
                     conn->shutdown();
                 }
             } else {
+                LogWarn("Not enough data to form a complete message")
                 break; // not enough data to form a complete message
             }
         } else {
@@ -85,11 +86,12 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
             buf->retrieve(readable);
 
             state.fileSize -= readable;
-            std::cout << "剩余文件大小: " << state.fileSize << " bytes\n";
+            LogInfo("剩余文件大小: {} bytes", state.fileSize);
             if (state.fileSize == 0) {
                 state.outfile->close();
                 m_fileTransferStates.erase(conn); // 清除状态
                 std::cout << "文件接收完成。" << std::endl;
+                LogInfo("文件接收完成")
             }
         }
     }

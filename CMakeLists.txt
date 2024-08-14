@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # 启用 AddressSanitizer
-set(ENABLE_ASAN TRUE)
+set(ENABLE_ASAN FALSE)
 
 if(ENABLE_ASAN)
     message(STATUS "AddressSanitizer enabled")

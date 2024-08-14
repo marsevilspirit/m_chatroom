@@ -7,7 +7,7 @@ fi
 mkdir build
 cd build
 cmake .. 
-make
+make -j8
 
 cp ../project/m_netlib/Log/logconf.json logconf.json
 

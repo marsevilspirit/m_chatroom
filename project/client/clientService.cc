@@ -66,6 +66,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 break;
         case ADD_FRIEND_SUCCESS:                std::cout << "添加成功" << std::endl;                                              
                                                 break;
+        case THE_OTHER_AGREE_FRIEND_REQUEST:    std::cout << "对方同意了你的好友申请" << std::endl;                                  
+                                                break;
         case ADD_FRIEND_REQUEST:                std::cout << "你向对方发起好友申请" << std::endl;                                  
                                                 break;
         case TO_ADD_FRIEND_REQUEST:             std::cout << "对方向你发起好友申请" << std::endl;                                  
@@ -102,9 +104,8 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 sem_post(&show_block_list);                                                        
                                                 break;
         case CHECK_BLOCK:                       if_block = (js["state1"] == "block") || (js["state2"] == "block"); 
+                                                std::cout << js["state1"] << " " << js["state2"] << std::endl;
                                                 if_friend = (js["state1"] == "friend") || (js["state2"] == "friend") || if_block; 
-                                                std::cout << "state1:" << js["state1"] << " state2:" << js["state2"] << std::endl;
-                                                std::cout << "if_friend:" << if_friend << " if_block:" << if_block << std::endl;
                                                 sem_post(&check_if_block);                                                         
                                                 break;
         case CREATE_GROUP_SUCCESS:              std::cout << "创建群聊成功" << std::endl;                                        
@@ -116,9 +117,11 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
                                                 break;
         case GROUP_REQUEST:                     std::cout << js["userid"] << "申请加入群聊"<< js["groupid"] << std::endl; 
                                                 break;
+        case ALREADY_IN_GROUP:                  std::cout << "你已在群聊中" << std::endl; 
+                                                break;
         case REQUEST_GROUP_SUCCESS:             std::cout << "提交加入群聊申请成功" << std::endl;                               
                                                 break;
-        case REQUEST_GROUP_FAIL:                std::cout << "提交加入群聊申请失败" << std::endl;                                  
+        case REQUEST_GROUP_FAIL:                std::cout << "提交加入群聊申请失败, 你的申请尚未处理" << std::endl;                                  
                                                 break;
         case DISPLAY_GROUP_REQUEST:             if_master_ormanager = displayGroupRequestList(js); 
                                                 sem_post(&add_someone_to_group);                                                
@@ -189,6 +192,10 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case CLIENT_LONGTIME_EXIT:              std::cout << "你太长时间未操作，服务器断开连接" << std::endl; 
                                                 client->disconnect(); 
                                                 ExitChatRoom();                                                      
+                                                break;
+        case SET_MANAGER_NOTICE:                std::cout << "你被设置为群"<< js["groupid"] << "的管理员" << std::endl; 
+                                                break;
+        case KICK_SOMEONE_NOT_IN_GROUP:         std::cout << "该用户不在群里, 无法踢出" << std::endl; 
                                                 break;
     }
 }
@@ -297,7 +304,7 @@ bool login(Client &client){
 void EnterCommandMenu(Client &client){
     while(1){
         std::cout << "\n";
-        std::cout << "command界面\n";
+        std::cout << "command界面 当前用户: id:" << CurrentUser.getId() << " name:" << CurrentUser.getName() << "\n";
         std::cout << "1.私聊        2.群聊\n";
         std::cout << "3.添加好友    4.删除好友\n";
         std::cout << "5.屏蔽好友    6.解除屏蔽\n";
@@ -589,10 +596,8 @@ void privateChat(Client &client) {
     std::string msg;
     json response;
 
-    if_friend = false;
     checkIfBlock(client, id_to_chat);
     sem_wait(&check_if_block);
-    usleep(1000);
 
     if(!if_friend) {
         std::cout << "你与对方不是好友" << std::endl;
@@ -1191,7 +1196,7 @@ void sendfile(Client &client) {
     std::cin >> receiver_id;
 
     if (!isNumber(receiver_id)) {
-        std::cout << "请输入数字" << std::endl;
+        std::cout << "\n请输入数字" << std::endl;
         return;
     }
 
@@ -1205,6 +1210,25 @@ void sendfile(Client &client) {
     std::cin >> filePath;
     clearInputBuffer();
 
+    // 获取文件信息
+    struct stat file_stat;
+    if (stat(filePath.c_str(), &file_stat) < 0) {
+        std::cerr << "\n无法获取文件信息: " << filePath << std::endl;
+        return;
+    }
+
+    // 判断是否为普通文件
+    if (!S_ISREG(file_stat.st_mode)) {
+        std::cerr << "\n错误: 该路径不是一个普通文件" << std::endl;
+        return;
+    }
+
+    // 判断是否为软链接
+    if (S_ISLNK(file_stat.st_mode)) {
+        std::cerr << "\n错误: 该路径是一个软链接" << std::endl;
+        return;
+    }
+
     // 打开文件
     int file_fd = open(filePath.c_str(), O_RDONLY);
     if (file_fd < 0) {
@@ -1213,13 +1237,13 @@ void sendfile(Client &client) {
     }
 
     // 获取文件大小
-    struct stat file_stat;
-    if (fstat(file_fd, &file_stat) < 0) {
+    struct stat send_file_stat;
+    if (fstat(file_fd, &send_file_stat) < 0) {
         std::cerr << "Failed to get file size: " << filePath << std::endl;
         close(file_fd);
         return;
     }
-    size_t fileSize = file_stat.st_size;
+    size_t fileSize = send_file_stat.st_size;
 
     std::cout << "fileSize: " << fileSize << std::endl;
 

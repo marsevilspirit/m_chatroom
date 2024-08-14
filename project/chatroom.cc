@@ -28,7 +28,7 @@ int main()
 
     // 设置定时器，每隔 5 秒刷新一次缓存到数据库
     subLoop1->runEvery(1.0, []() {
-        cacheManager->flushCacheToDatabase();
+            cacheManager->flushCacheToDatabase();
     });
 
     EventLoop* subLoop2 = server.getNextLoop();
