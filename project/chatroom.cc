@@ -22,17 +22,21 @@ int main()
 
     server.start();
 
-    EventLoop* subLoop = server.getNextLoop();
+    EventLoop* subLoop1 = server.getNextLoop();
 
     // 设置定时器，每隔 5 秒刷新一次缓存到数据库
-    subLoop->runEvery(1.0, []() {
+    subLoop1->runEvery(1.0, []() {
         cacheManager->flushCacheToDatabase();  // 刷新缓存到数据库
     });
 
-    subLoop->runEvery(10.0, []() {
-        std::cout << "心跳检测检查" << std::endl;
+    /*
+    EventLoop* subLoop2 = server.getNextLoop();
+
+    subLoop2->runEvery(10.0, []() {
+        LogInfo("心跳检测检查")
         Service::getInstance()->checkIfConnAlive();
     });
+    */
 
     loop.loop();
 

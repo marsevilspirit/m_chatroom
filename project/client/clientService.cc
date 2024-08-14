@@ -1268,7 +1268,7 @@ void sendfile(Client &client) {
     }
 
     close(file_fd);
-    std::cout << "File sent successfully." << std::endl;
+    std::cout << "文件发送完成" << std::endl;
 
     // 恢复为非阻塞模式
     if (fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {

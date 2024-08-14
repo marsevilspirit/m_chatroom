@@ -489,7 +489,7 @@ void Service::response_to_master_or_manager(int groupid, int userid){
 
     if (userVec.size() == 0)
     {
-        std::cout << "no member in group" << std::endl;
+        LogInfo("no member in group")
         return;
     }
 
@@ -759,7 +759,7 @@ void Service::handleCheckIfGroupMember(const TcpConnectionPtr &conn, json &js, T
 
     json response;
     response["msgid"] = CHECK_IF_GROUP_MEMBER;
-    response["state"] = !((state == "not")|| (state == "request"));
+    response["state"] = !((state == "")|| (state == "request"));
     conn->send(response.dump().append("\r\n"));
 }
 
@@ -854,7 +854,7 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     // 打开文件
     int fileFd = open(filePath.c_str(), O_RDONLY);
     if (fileFd < 0) {
-        std::cerr << "Failed to open file: " << filePath << " - " << strerror(errno) << std::endl;
+        LogError("Failed to open file: {} - {}", filePath, strerror(errno))
         json response;
         response["msgid"] = RECEIVE_FILE_FAIL;
         conn->send(response.dump().append("\r\n"));
@@ -864,13 +864,13 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     // 获取文件大小
     struct stat fileStat;
     if (fstat(fileFd, &fileStat) < 0) {
-        std::cerr << "Failed to get file stats: " << strerror(errno) << std::endl;
+        LogError("Failed to get file stats: {}", strerror(errno))
         close(fileFd);
         return;
     }
     size_t fileSize = fileStat.st_size;
 
-    std::cout << "fileSize: " << fileSize << std::endl;
+    LogInfo("fileSize: {}", fileSize)
 
     // 移除当前连接与用户映射，防止群聊信息干扰
     m_userConnMap.erase(m_connUserMap[conn]);
@@ -890,13 +890,13 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
     // 获取当前文件描述符的标志
     int flags = fcntl(connFd, F_GETFL, 0);
     if (flags < 0) {
-        std::cerr << "Failed to get file descriptor flags: " << strerror(errno) << std::endl;
+        LogError("Failed to get file descriptor flags: {}", strerror(errno))
         return;
     }
 
     // 设置为阻塞模式
     if (fcntl(connFd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
-        std::cerr << "Failed to set blocking mode: " << strerror(errno) << std::endl;
+        LogError("Failed to set blocking mode: {}", strerror(errno))
         return;
     }
 
@@ -911,22 +911,22 @@ void Service::handleReceiveFile(const TcpConnectionPtr &conn, json &js, Timestam
                 usleep(10000); // 10ms 延迟
                 continue;
             } else {
-                std::cerr << "Sendfile error: " << strerror(errno) << std::endl;
+                LogError("Sendfile error: {}", strerror(errno))
                 close(fileFd);
                 return;
             }
         }
         remaining -= sent;
 
-        std::cout << "Progress: " << (fileSize - remaining) << "/" << fileSize << " bytes" << std::endl;
+        LogInfo("Progress: {}/{} bytes", fileSize - remaining, fileSize)
     }
 
     close(fileFd);
-    std::cout << "File sent successfully." << std::endl;
+    LogInfo("File sent successfully.")
 
     // 恢复为非阻塞模式
     if (fcntl(connFd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        std::cerr << "Failed to restore non-blocking mode: " << strerror(errno) << std::endl;
+        LogError("Failed to restore non-blocking mode: {}", strerror(errno))
         return;
     }
 
@@ -1006,7 +1006,6 @@ void Service::checkIfConnAlive() {
 
     // 首先收集需要删除的连接
     for (auto it = m_connStatusMap.begin(); it != m_connStatusMap.end(); ++it) {
-        std::cout << "it->first:" << it->first << " it->second:" << it->second << std::endl;
         if (it->second == false) {
             connectionsToDelete.push_back(it->first);
         } else {
