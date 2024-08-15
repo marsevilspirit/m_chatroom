@@ -35,9 +35,10 @@ std::atomic<bool> if_master_ormanager(false);
 std::atomic<bool> if_master(false);
 std::atomic<bool> if_group_member(false);
 
-std::atomic<int> private_chat_id(-1);
-
 User CurrentUser;
+
+int CurrentGroupChatId = -1;
+int private_chat_id = -1;
 
 void handleServerMessage(Client* client, json &js, Timestamp time){
     int msgid = js["msgid"].get<int>();
@@ -196,6 +197,9 @@ void handleServerMessage(Client* client, json &js, Timestamp time){
         case SET_MANAGER_NOTICE:                std::cout << "你被设置为群"<< js["groupid"] << "的管理员" << std::endl; 
                                                 break;
         case KICK_SOMEONE_NOT_IN_GROUP:         std::cout << "该用户不在群里, 无法踢出" << std::endl; 
+                                                break;
+        case KICK_SOMEONE_NOTICE:               if(CurrentGroupChatId == js["groupid"])
+                                                    if_group_member = false;
                                                 break;
     }
 }
@@ -1049,12 +1053,14 @@ void groupChat(Client& client){
 
     std::cout << "进入群聊" << std::endl;
 
+    CurrentGroupChatId = std::stoi(groupid);
+
     std::string msg;
     json response;
 
     bool if_display_group_history = true;
 
-    while(1){
+    while(if_group_member){
 
         if(if_display_group_history){
             std::cout << "历史记录:" << std::endl;
@@ -1075,6 +1081,13 @@ void groupChat(Client& client){
         response["msg"] = msg;
 
         client.send(response.dump().append("\r\n"));
+    }
+
+    CurrentGroupChatId = -1;
+
+    if(if_group_member == false)
+    {
+        std::cout << "你已被提出群聊" << std::endl;
     }
 }
 

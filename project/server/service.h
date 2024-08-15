@@ -119,6 +119,16 @@ public:
         std::lock_guard<std::mutex> lock(m_connMutex);
         m_connStatusMap[conn] = status;
     }
+
+    void removeConnStatus(const TcpConnectionPtr &conn){
+        std::lock_guard<std::mutex> lock(m_connMutex);
+        m_connStatusMap.erase(conn);
+    }
+
+    void addConnStatus(const TcpConnectionPtr &conn){
+        std::lock_guard<std::mutex> lock(m_connMutex);
+        m_connStatusMap[conn] = true;
+    }
 private:
     Service();
 

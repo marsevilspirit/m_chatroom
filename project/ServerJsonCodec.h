@@ -7,6 +7,7 @@
 #include "m_netlib/Net/TcpConnection.h"
 #include "m_netlib/Base/Timestamp.h"
 #include "m_netlib/Log/mars_logger.h"
+#include "server/service.h"
 #include "public.h"
 
 using namespace mars;
@@ -59,12 +60,20 @@ void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time) {
 
                         // 将文件传输状态存储在 map 中
                         m_fileTransferStates[conn] = {outfile, fileSize};
+                        
+                        // 防止心跳超时
+                        Service::getInstance()->removeConnStatus(conn);
+
                     } else if (msgid == SEND_FILE_END) {
                         auto it = m_fileTransferStates.find(conn);
                         if (it != m_fileTransferStates.end()) {
                             it->second.outfile->close();
                             m_fileTransferStates.erase(it); // 清除状态
                         }
+
+                        // 防止心跳超时
+                        Service::getInstance()->addConnStatus(conn);
+
                     } else {
                         m_messageCallback(conn, js, time);
                     }

@@ -276,7 +276,7 @@ void Service::handleDeleteFriend(const TcpConnectionPtr &conn, json &js, Timesta
     std::string state1 = m_friendModel.getState(from_id, to_id);
     std::string state2 = m_friendModel.getState(to_id, from_id);
 
-    if (state1 == "friend" && state2 == "friend")
+    if ((state1 == "friend" || state1 == "block" ) && (state2 == "friend" || state2 == "block"))
     {
         m_friendModel.deleteEach(from_id, to_id);
         return;
@@ -766,6 +766,16 @@ void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, T
         json response;
         response["msgid"] = KICK_SOMEONE_SUCCESS;
         conn->send(response.dump().append("\r\n"));
+
+        json response2;
+        response2["msgid"] = KICK_SOMEONE_NOTICE;
+        response2["groupid"] = groupid;
+        auto it = m_userConnMap.find(userid);
+        if (it != m_userConnMap.end())
+        {
+            it->second->send(response2.dump().append("\r\n"));
+        }
+
     } else if(kick_state == "manager"){
         if(be_kick_state == "manager" || be_kick_state == "master"){
             json response;
@@ -780,6 +790,15 @@ void Service::handleKickSomeoneInGroup(const TcpConnectionPtr &conn, json &js, T
         json response;
         response["msgid"] = KICK_SOMEONE_SUCCESS;
         conn->send(response.dump().append("\r\n"));
+
+        json response2;
+        response2["msgid"] = KICK_SOMEONE_NOTICE;
+        response2["groupid"] = groupid;
+        auto it = m_userConnMap.find(userid);
+        if (it != m_userConnMap.end())
+        {
+            it->second->send(response2.dump().append("\r\n"));
+        }
     } else {
         json response;
         response["msgid"] = KICK_SOMEONE_FAIL;

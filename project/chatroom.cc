@@ -33,7 +33,7 @@ int main()
 
     EventLoop* subLoop2 = server.getNextLoop();
 
-    subLoop2->runEvery(120.0, []() {
+    subLoop2->runEvery(300.0, []() {
         LogInfo("心跳检测检查")
         Service::getInstance()->checkIfConnAlive();
     });
