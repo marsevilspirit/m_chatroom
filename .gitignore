@@ -3,5 +3,3 @@ CMakeCache.txt
 CMakeFiles/
 *.cmake 
 /build
-Dockerfile
-docker-compose.yml
