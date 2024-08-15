@@ -3,7 +3,6 @@
 #include "service.h"
 #include "../m_netlib/Log/mars_logger.h"
 
-#include <iostream>
 #include <string>
 #include <functional>
 
@@ -36,6 +35,7 @@ void Server::onConnection(const TcpConnectionPtr &conn)
     if (conn->connected())
     {
         LogInfo("onConnection(): new connection [{}] from {}", conn->name(), conn->peerAddress().toHostPort())
+        Service::getInstance()->setConnStatus(conn, true);
     }
     else
     {

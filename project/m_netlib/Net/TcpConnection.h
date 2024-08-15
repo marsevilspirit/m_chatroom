@@ -37,6 +37,7 @@ public:
     void send(const std::string& message);
 
     void shutdown();
+    void forceClose();
     void setTcpNoDelay(bool on);
     void setTcpKeepAlive(bool on);
 
@@ -56,6 +57,7 @@ private:
     void handleError();
     void sendInLoop(const std::string& messafe);
     void shutdownInLoop();
+    void forceCloseInLoop();
 
     EventLoop* m_loop;
     std::string m_name;

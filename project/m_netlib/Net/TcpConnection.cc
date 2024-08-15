@@ -86,6 +86,20 @@ void TcpConnection::shutdown(){
     }
 }
 
+void TcpConnection::forceClose(){
+    if (m_state == kConnected || m_state == kDisconnecting){
+        setState(kDisconnecting);
+        m_loop->queueInLoop(std::bind(&TcpConnection::forceCloseInLoop, shared_from_this()));
+    }
+}
+
+void TcpConnection::forceCloseInLoop(){
+    m_loop->assertInLoopThread();
+    if (m_state == kConnected || m_state == kDisconnecting){
+        handleClose();
+    }
+}
+
 void TcpConnection::setTcpNoDelay(bool on){
     m_socket->setTcpNoDelay(on);
 }

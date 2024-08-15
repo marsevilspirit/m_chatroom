@@ -1065,7 +1065,7 @@ void Service::checkIfConnAlive() {
 
             usleep(10000);
 
-            conn->shutdown();
+            conn->forceClose();
 
             m_userConnMap.erase(id);
             m_connUserMap.erase(conn);
