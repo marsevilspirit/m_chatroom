@@ -5,6 +5,7 @@
 #include <queue>
 #include <thread>
 #include <mutex>
+#include <type_traits>
 #include <vector>
 #include <functional>
 #include <condition_variable>
@@ -13,11 +14,11 @@
 
 class threadpool {
 public:
-    threadpool(size_t threads);
+    threadpool(size_t threads = 20);
     ~threadpool();
 
     template <typename F, typename... Args>
-    auto enqueue(F&& f, Args&&... args) -> std::future<typename std::result_of<F(Args...)>::type>;
+    auto enqueue(F&& f, Args&&... args) -> std::future<typename std::invoke_result<F, Args...>::type>;
 
 private:
     std::vector<std::thread> workers;
@@ -28,7 +29,7 @@ private:
 };
 
 template<class F, class... Args>
-auto threadpool::enqueue(F&& f, Args&&... args) -> std::future<typename std::result_of<F(Args...)>::type>
+auto threadpool::enqueue(F&& f, Args&&... args) -> std::future<typename std::invoke_result<F, Args...>::type>
 {
     using return_type = typename std::result_of<F(Args...)>::type;
 

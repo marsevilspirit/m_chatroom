@@ -68,6 +68,5 @@ void Server::onJsonMessage(const TcpConnectionPtr &conn, json &js, Timestamp tim
 
     auto JsonMsgHandler = Service::getInstance()->getHandler(msgid);
 
-    // 回调消息对应的处理器
-    JsonMsgHandler(conn, js, time);
+    m_threadpool.enqueue(JsonMsgHandler, conn, js, time);
 }

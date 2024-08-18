@@ -10,6 +10,8 @@
 
 客户端，两个线程，`EventLoop`独占一个线程处理网络IO，另一个线程负责读键盘，采用不阻塞的方式与服务器连接。
 
+服务器的日志库是我自己写的`mlog`日志库。
+
 数据通过`mysql`进行管理和操作, `redis`作为缓存, 使用`json`序列化和反序列化。
 
 C++书写，通过`Cmake`管理多文件编译。
@@ -32,7 +34,7 @@ C++书写，通过`Cmake`管理多文件编译。
 `archlinux`:
 
 ```
-sudo pacman -S openssl hiredis mysql-clients fmt jsoncpp
+sudo pacman -S openssl hiredis mysql-clients fmt
 ```
 
 使用了`nlohmann`的`json`库
@@ -171,4 +173,8 @@ JSON                             1              0              0             11
 SUM:                            95           1728            364           6813
 -------------------------------------------------------------------------------
 ```
+
+
+
+#### 服务器
 

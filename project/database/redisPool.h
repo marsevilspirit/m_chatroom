@@ -15,7 +15,6 @@ public:
         return instance;
     }
 
-    // 初始化连接池（可选）
     void init(const std::string& host, int port, size_t poolSize);
 
     redisContext* getConnection();

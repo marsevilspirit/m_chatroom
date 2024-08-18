@@ -5,6 +5,7 @@
 
 #include <hiredis/hiredis.h>
 #include <string>
+#include <vector>
 #include "../m_netlib/Log/mars_logger.h"
 
 class Redis {

@@ -9,6 +9,4 @@ cd build
 cmake .. 
 make -j8
 
-cp ../project/m_netlib/Log/logconf.json logconf.json
-
 mkdir received_files

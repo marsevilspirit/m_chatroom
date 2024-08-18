@@ -15,6 +15,7 @@ void RedisPool::init(const std::string& host, int port, size_t poolSize) {
                     LogWarn("Cannot allocate Redis context");
                 }
             } else {
+                LogInfo("connect redis success!")
                 m_pool.push(context);
             }
         }

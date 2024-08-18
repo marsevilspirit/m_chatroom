@@ -3,18 +3,13 @@
 
 #include <iostream>
 #include <string>
-#include <json/json.h>
 #include <fstream>
 #include <mutex>
 #include <filesystem>
 #include <fmt/core.h>
 #include <unordered_map>
-#include <chrono>
-#include <sstream>
-#include <iomanip>
-#include <regex> // 用于去除 ANSI 代码
-
-#define LOG_CONFIG_PATH "./logconf.json"
+#include <array>
+#include <cstdlib>
 
 #define RED "\033[31m"
 #define GREEN "\033[32m"
@@ -81,7 +76,7 @@ public:
         try{
             log = LogHead(level) + fmt::format(fmt, args...) + LogDetail(file_name, func_name, line_no);
         } catch (const std::exception& e) {
-            std::cerr << "Error in log format: " << e.what() << " in " << file_name << " at " << func_name << " line " << line_no << '\n';
+            std::cerr << "\033[31mError in log format: " << e.what() << " in " << file_name << " at " << func_name << " line " << line_no << "\033[0m\n";
             return;
         }
 
@@ -137,8 +132,8 @@ private:
 
 }
 
-#define LogInfo(fmt, ...)   mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::INFO, fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
-#define LogWarn(fmt, ...)   mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::WARN, fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
+#define LogInfo(fmt, ...)   mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::INFO,  fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
+#define LogWarn(fmt, ...)   mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::WARN,  fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 #define LogError(fmt, ...)  mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::ERROR, fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 #define LogFatal(fmt, ...)  mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::FATAL, fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);
 #define LogDebug(fmt, ...)  mars::MarsLogger::getInstance()->_log_impl(mars::LogLevel::DEBUG, fmt, __FILE__, __func__, __LINE__, ##__VA_ARGS__);

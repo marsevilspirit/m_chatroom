@@ -5,6 +5,7 @@
 #include "../m_netlib/Net/EventLoop.h"
 #include "../m_netlib/Base/noncopyable.h"
 #include "../ServerJsonCodec.h"
+#include "../threadpool/threadpool.h"
 
 
 using namespace mars;
@@ -28,6 +29,7 @@ private:
     TcpServer m_server;
     EventLoop* m_loop;
     JsonCodec m_codec;
+    threadpool m_threadpool;
 };
 
 #endif // MARS_SERVER_H
