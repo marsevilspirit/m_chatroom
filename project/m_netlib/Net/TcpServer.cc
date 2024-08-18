@@ -38,10 +38,8 @@ void TcpServer::start(){
 
 void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr){
     m_loop->assertInLoopThread();
-    char buf[32];
-    snprintf(buf, sizeof(buf), "#%d", m_nextConnId);
-    ++m_nextConnId;
-    std::string connName = m_name + buf;
+
+    std::string connName = m_name + "#" + std::to_string(m_nextConnId++);
 
     LogInfo("TcpServer::newConnection [{}] - new connection [{}] from {}",
             m_name, connName, peerAddr.toHostPort());
