@@ -246,7 +246,7 @@ void EnterChatRoom(Client &client){
         switch (choice){
             case 1: reg(client);                                  break;
             case 2: if(login(client)) {EnterCommandMenu(client);} break;
-            case 3: sem_destroy(&login_sem); exit(EXIT_SUCCESS);  break;
+            case 3: ExitChatRoom();                               break;
         }
     }   
 

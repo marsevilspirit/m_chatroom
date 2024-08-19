@@ -1111,6 +1111,12 @@ void Service::clientClose(const TcpConnectionPtr &conn) {
             m_connUserMap.erase(conn);
             m_userConnMap.erase(userId);
         }
+
+        auto itt = m_connStatusMap.find(conn);
+        if (itt != m_connStatusMap.end()) {
+            LogInfo("client {} close", userId);
+            m_connStatusMap.erase(conn);
+        }
     }
 
     // 更新用户的状态信息

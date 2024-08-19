@@ -41,7 +41,7 @@ void Server::onConnection(const TcpConnectionPtr &conn)
     {
         LogInfo("onConnection(): connection [{}] is down", conn->name())
         Service::getInstance()->clientClose(conn);
-        conn->shutdown();
+        conn->forceClose();
     }
 }
 

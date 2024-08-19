@@ -44,8 +44,9 @@ sudo pacman -S openssl hiredis mysql-clients fmt
 #### 目录结构
 
 ```
-                                                                       .
+.
 ├── CMakeLists.txt
+├── init.sql
 ├── project
 │   ├── chatclient.cc
 │   ├── chatroom.cc
@@ -77,7 +78,6 @@ sudo pacman -S openssl hiredis mysql-clients fmt
 │   │   │   └── Timestamp.h
 │   │   ├── CMakeLists.txt
 │   │   ├── Log
-│   │   │   ├── logconf.json
 │   │   │   ├── mars_logger.cc
 │   │   │   └── mars_logger.h
 │   │   ├── Net
@@ -163,14 +163,16 @@ sudo pacman -S openssl hiredis mysql-clients fmt
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-C++                             36            973            256           4592
-C/C++ Header                    48            701            100           1928
+C++                             36            979            255           4614
+C/C++ Header                    48            706            101           1940
+Markdown                         1             31              0            151
 CMake                            7             26              8            148
-Markdown                         1             21              0            114
-Bourne Shell                     2              7              0             20
-JSON                             1              0              0             11
+SQL                              1              7              0             45
+YAML                             1              4              0             30
+Bourne Shell                     2              6              0             19
+Dockerfile                       1              5              4             10
 -------------------------------------------------------------------------------
-SUM:                            95           1728            364           6813
+SUM:                            97           1764            368           6957
 -------------------------------------------------------------------------------
 ```
 
