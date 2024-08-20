@@ -110,4 +110,3 @@ private:
 };
 
 #endif //CLIENT_JSON_CODEC_H
-
