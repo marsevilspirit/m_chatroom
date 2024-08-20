@@ -84,6 +84,9 @@ void flushPrivateChatCache() {
         return;
     }
 
+    // 清空 Redis 缓存，防止数据重复
+    redis.ltrim("private_chat_cache", 1, 0);
+
     // 获取 MySQL 连接
     auto mysql = MysqlPool::getInstance().getConnection();
     if (!mysql) {
@@ -94,48 +97,52 @@ void flushPrivateChatCache() {
     // 开始事务
     mysql->startTransaction();
 
-    // 批量插入构造
-    std::stringstream ss;
-    ss << "INSERT INTO private_chat_history (sender_id, receiver_id, message, timestamp) VALUES ";
+    size_t batchSize = 1000;  // 每批插入的消息条数
+    size_t totalMessages = cachedMessages.size();
 
-    bool first = true;
-    for (const auto &record_str : cachedMessages) {
-        // 使用 nlohmann::json 解析 JSON 字符串
-        nlohmann::json record = nlohmann::json::parse(record_str);
+    for (size_t i = 0; i < totalMessages; i += batchSize) {
+        std::stringstream ss;
+        ss << "INSERT INTO private_chat_history (sender_id, receiver_id, message, timestamp) VALUES ";
 
-        // 提取字段
-        std::string sender_id = record["sender_id"];
-        std::string receiver_id = record["receiver_id"];
-        std::string message = record["message"];
-        std::string timestamp = record["timestamp"];
+        bool first = true;
+        for (size_t j = i; j < std::min(i + batchSize, totalMessages); ++j) {
+            const auto &record_str = cachedMessages[j];
+            
+            // 使用 nlohmann::json 解析 JSON 字符串
+            nlohmann::json record = nlohmann::json::parse(record_str);
 
-        std::string escapedMessage = escapeSingleQuotes(message);
+            // 提取字段
+            std::string sender_id = record["sender_id"];
+            std::string receiver_id = record["receiver_id"];
+            std::string message = record["message"];
+            std::string timestamp = record["timestamp"];
 
-        if (!first) {
-            ss << ",";
+            std::string escapedMessage = escapeSingleQuotes(message);
+
+            if (!first) {
+                ss << ",";
+            }
+            first = false;
+            ss << "('" << sender_id << "', '" << receiver_id << "', '" << escapedMessage << "', '" << timestamp << "')";
         }
-        first = false;
-        ss << "('" << sender_id << "', '" << receiver_id << "', '" << escapedMessage << "', '" << timestamp << "')";
-    }
-    ss << ";";
+        ss << ";";
 
-    // 执行批量插入
-    if (!mysql->update(ss.str())) {
-        LogWarn("Failed to insert private messages into MySQL");
-        mysql->rollback();
-        MysqlPool::getInstance().releaseConnection(mysql);
-        return;
+        // 执行批量插入
+        if (!mysql->update(ss.str())) {
+            LogWarn("Failed to insert private messages into MySQL");
+            mysql->rollback();
+            MysqlPool::getInstance().releaseConnection(mysql);
+            return;
+        }
     }
 
     // 提交事务
     mysql->commit();
 
-    // 清空 Redis 缓存
-    redis.ltrim("private_chat_cache", 1, 0);
-
     // 释放 MySQL 连接
     MysqlPool::getInstance().releaseConnection(mysql);
 }
+
 void flushGroupChatCache() {
     // 从 Redis 中获取缓存的消息
     std::vector<std::string> cachedMessages = redis.lrange("group_chat_cache", 0, -1);
@@ -183,6 +190,9 @@ void flushGroupChatCache() {
     if (!mysql->update(ss.str())) {
         LogWarn("Failed to insert group messages into MySQL");
         mysql->rollback();
+
+        redis.ltrim("private_chat_cache", 1, 0); // 先保证服务器不崩
+
         MysqlPool::getInstance().releaseConnection(mysql);
         return;
     }

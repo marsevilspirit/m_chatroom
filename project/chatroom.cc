@@ -1,13 +1,13 @@
 #include "server/server.h"
 #include "server/service.h"
 #include "model/historyCasheManager.h"
-//#include "threadpool/threadpool.h"
+#include "threadpool/threadpool.h"
 
 #include <cstdlib>
 #include <signal.h>
 
 std::shared_ptr<CacheManager> cacheManager = std::make_shared<CacheManager>();
-//std::shared_ptr<threadpool> threadPool = std::make_shared<threadpool>(THREAD_NUM);
+std::shared_ptr<threadpool> threadPool = std::make_shared<threadpool>(THREAD_NUM);
 
 void resetHandler(int sig){
     Service::getInstance()->reset();
@@ -28,7 +28,9 @@ int main()
 
     // 设置定时器，每隔 5 秒刷新一次缓存到数据库
     subLoop1->runEvery(1.0, []() {
-            cacheManager->flushCacheToDatabase();
+            threadPool->enqueue([]() {
+                cacheManager->flushCacheToDatabase();
+            });
     });
 
     EventLoop* subLoop2 = server.getNextLoop();

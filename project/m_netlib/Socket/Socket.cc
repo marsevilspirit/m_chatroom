@@ -1,6 +1,5 @@
 #include "Socket.h"
 #include "SocketOps.h"
-#include "../Log/mars_logger.h"
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -15,7 +14,6 @@ Socket::Socket(int sockfd) : m_sockfd(sockfd)
 Socket::~Socket() 
 {
     sockets::close(m_sockfd);
-    LogError("Socket::~Socket() fd = {}", m_sockfd);
 }
 
 void Socket::bindAddress(const InetAddress& localaddr) 

@@ -66,7 +66,6 @@ void TcpConnection::handleRead(base::Timestamp receiveTime){
 }
 
 void TcpConnection::handleClose(){
-    LogError("TcpConnection::handleClose ");
     m_loop->assertInLoopThread();
     assert(m_state == kConnected || m_state == kDisconnecting);
     LogInfo("enter TcpConnection::handleClose [{}] - SO_ERROR = 0", m_name);
