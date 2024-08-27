@@ -24,7 +24,6 @@ services:
     depends_on:
       - mysql
       - redis
-    command: /bin/bash -c "while true; do sleep 1000; done"
 
   mysql:
     image: mysql:8.0

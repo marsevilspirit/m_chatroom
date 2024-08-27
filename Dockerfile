@@ -17,4 +17,4 @@ WORKDIR /chatroom
 
 COPY . /chatroom
 
-CMD ["./build/chatroom"]
+CMD ["./setup.sh"]

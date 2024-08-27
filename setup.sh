@@ -10,3 +10,5 @@ cmake ..
 make -j8
 
 mkdir received_files
+
+./chatroom
