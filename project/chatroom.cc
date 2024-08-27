@@ -7,7 +7,7 @@
 #include <signal.h>
 
 std::shared_ptr<CacheManager> cacheManager = std::make_shared<CacheManager>();
-std::shared_ptr<threadpool> threadPool = std::make_shared<threadpool>(THREAD_NUM);
+std::shared_ptr<threadpool> mysqlInsertThreadPool = std::make_shared<threadpool>(10);
 
 void resetHandler(int sig){
     Service::getInstance()->reset();
@@ -16,6 +16,8 @@ void resetHandler(int sig){
 
 int main()
 {
+    LogDebug("111111111111111111111");
+    
     signal(SIGINT, resetHandler);
 
     EventLoop loop;
@@ -28,7 +30,7 @@ int main()
 
     // 设置定时器，每隔 5 秒刷新一次缓存到数据库
     subLoop1->runEvery(1.0, []() {
-            threadPool->enqueue([]() {
+            mysqlInsertThreadPool->enqueue([]() {
                 cacheManager->flushCacheToDatabase();
             });
     });

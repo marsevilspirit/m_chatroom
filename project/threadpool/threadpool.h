@@ -10,11 +10,9 @@
 #include <functional>
 #include <condition_variable>
 
-#define THREAD_NUM 20
-
 class threadpool {
 public:
-    threadpool(size_t threads = 20);
+    threadpool(size_t threads = 32);
     ~threadpool();
 
     template <typename F, typename... Args>

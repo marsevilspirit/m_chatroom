@@ -1,13 +1,23 @@
 #include "redis.h"
 #include "redisPool.h"
 
+
 Redis::Redis() : m_context(nullptr) {}
 
 Redis::~Redis() {}
 
 bool Redis::connect() {
     // 初始化连接池（可选）
-    RedisPool::getInstance().init("127.0.0.1", 6379, 10);
+
+    const std::string redis_host = std::getenv("REDIS_HOST") ? std::getenv("REDIS_HOST") : "";
+    std::cout << "REDIS_HOST: " << redis_host << std::endl;
+
+    if(redis_host.empty()) {
+        LogError("REDIS_HOST is not set");
+        exit(1);
+    }
+
+    RedisPool::getInstance().init(redis_host, 6379, 10);
     return true;
 }
 

@@ -1,13 +1,11 @@
 #include "database.h"
 #include "../m_netlib/Log/mars_logger.h"
 
-// 数据库配置信息
-/*
-static std::string server = "127.0.0.1";
-static std::string user = "root";
-static std::string password = "661188";
-static std::string dbname = "chatroom2";
-*/
+/*static std::string server = "127.0.0.1";*/
+const char* mysql_host = std::getenv("MYSQL_HOST");
+const char* mysql_user = std::getenv("MYSQL_USER");
+const char* mysql_password = std::getenv("MYSQL_PASSWORD");
+const char* mysql_database = std::getenv("MYSQL_DATABASE");
 
 // 初始化数据库连接
 MySQL::MySQL()
@@ -25,8 +23,8 @@ MySQL::~MySQL()
 // 连接数据库
 bool MySQL::connect()
 {
-    MYSQL *p = mysql_real_connect(m_conn, "127.0.0.1", "root",
-                                  "661188", "chatroom2", 3306, nullptr, 0);
+    MYSQL *p = mysql_real_connect(m_conn, mysql_host, mysql_user,
+                                  mysql_password, mysql_database, 3306, nullptr, 0);
     if (p != nullptr)
     {
         mysql_query(m_conn, "set names utf8mb4");

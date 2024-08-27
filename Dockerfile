@@ -9,11 +9,12 @@ RUN sed -i 's/^#Server/Server/g' /etc/pacman.d/mirrorlist && \
     echo "Server = https://mirrors.aliyun.com/archlinux/\$repo/os/\$arch" >> /etc/pacman.d/mirrorlist && \
     echo "Server = https://mirrors.ustc.edu.cn/archlinux/\$repo/os/\$arch" >> /etc/pacman.d/mirrorlist && \
     pacman -Syyu --noconfirm && \
-    pacman -S --noconfirm clang gcc base-devel cmake openssl hiredis mysql-clients fmt jsoncpp
+    pacman -S --noconfirm clang gcc base-devel cmake openssl hiredis mysql-clients fmt jsoncpp && \
+    bash -c 'bash setup.sh'
 
 # Set environment variables.
 WORKDIR /chatroom
 
 COPY . /chatroom
 
-CMD ["bash", "setup.sh"]
+CMD ["./build/chatroom"]

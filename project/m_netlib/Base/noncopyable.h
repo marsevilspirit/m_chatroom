@@ -8,12 +8,13 @@ namespace mars {
 struct base_token {};
 
 class noncopyable : base_token {
-protected:
+public:
+    noncopyable(const noncopyable&) = delete;
+    void operator=(const noncopyable&) = delete;
+
+protected: //防止直接实例化
     noncopyable() = default;
     ~noncopyable() = default;
-
-    noncopyable(const noncopyable&) = delete;
-    noncopyable& operator=(const noncopyable&) = delete;
 };
 
 } // namespace mars
